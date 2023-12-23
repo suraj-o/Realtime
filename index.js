@@ -394,7 +394,7 @@ const sendNoti = async (data) => {
 const sendNotifcation = async (data) => {
   try {
     const topic = await Topic.findById(data?.sendtopicId).populate({
-      path: "notifications",
+      path: "members",
       model: "User",
       select: "notificationtoken",
     });
@@ -405,10 +405,27 @@ const sendNotifcation = async (data) => {
     //   .filter((token) => token.subscribed === true)
     //   .map((token) => token.token);
 
-    const subscribedTokens = topic?.notifications?.map(
-      (t) => t.notificationtoken
-    );
+    // const subscribedTokens = topic?.notifications?.map(
+    //   (t) => t.notificationtoken
+    // );
 
+    const subscribedTokens = topic?.members?.map((t) => t.notificationtoken);
+    let tokens = [];
+
+    if (Array.isArray(subscribedTokens) && subscribedTokens.length > 0) {
+      for (const token of subscribedTokens) {
+        try {
+          tokens.push(token);
+        } catch (error) {
+          console.error(
+            `Error sending notification to token ${token}:`,
+            error.message
+          );
+        }
+      }
+    } else {
+      console.warn("No valid tokens to send notifications.");
+    }
     const message = {
       notification: {
         title: data?.comtitle,
@@ -428,12 +445,12 @@ const sendNotifcation = async (data) => {
         sendtopicId: `${data?.sendtopicId}`,
         postId: `${data?.postId}`,
       },
-      tokens: subscribedTokens,
+      tokens: tokens,
     };
 
     await admin
       .messaging()
-      .sendMulticast(message)
+      .sendEachForMulticast(message)
       .then((response) => {
         console.log("Successfully sent message");
       })
