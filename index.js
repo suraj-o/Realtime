@@ -180,6 +180,39 @@ io.on("connection", (socket) => {
       sendNotifcation(data);
     }
   });
+  socket.on("singleChatMessage", async ({ roomId, userId, data }) => {
+    const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
+    if (usercheck) {
+      console.log("sent", roomId);
+      socket.join(roomId);
+      socket.to(roomId).emit("ms", data);
+      SaveChats(data);
+      sendNoti(data);
+    } else {
+      console.log("joined and sent");
+      socket.join(roomId);
+      addUserToRoom(roomId, userId, socket.id);
+      socket.to(roomId).emit("ms", data);
+      SaveChats(data);
+      sendNoti(data);
+    }
+  });
+
+  socket.on("singleChatContent", async ({ roomId, userId, data }) => {
+    const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
+    if (usercheck) {
+      console.log("sent", roomId);
+      socket.join(roomId);
+      socket.to(roomId).emit("ms", data);
+      sendNoti(data);
+    } else {
+      console.log("joined and sent");
+      socket.join(roomId);
+      addUserToRoom(roomId, userId, socket.id);
+      socket.to(roomId).emit("ms", data);
+      sendNoti(data);
+    }
+  });
 
   socket.on("leaveRoom", ({ roomId, userId }) => {
     socket.leave(roomId);
@@ -317,6 +350,7 @@ const SaveChats = async (data) => {
       timestamp: data?.timestamp,
     });
     await message.save();
+    console.log("Saved");
     // await User.updateOne(
     //   { _id: data?.reciever },
     //   { $push: { mesIds: data?.mesId } }
@@ -361,15 +395,29 @@ const sendNoti = async (data) => {
       const message = {
         notification: {
           title: data?.sender_fullname,
-          body: data?.text,
+          body:
+            data?.typ === "image"
+              ? "Image"
+              : data?.typ === "video"
+              ? "Video"
+              : data?.typ === "doc"
+              ? "Document"
+              : data?.text,
         },
         data: {
           screen: "Chats",
           sender_fullname: `${data?.sender_fullname}`,
           sender_id: `${data?.sender_id}`,
-          text: `${data?.text}`,
+          text:
+            data?.type === "image"
+              ? "Image"
+              : data?.typ === "video"
+              ? "Video"
+              : data?.typ === "doc"
+              ? "Document"
+              : `${data?.text}`,
           convId: `${data?.convId}`,
-          createdAt: `${data?.createdAt}`,
+          createdAt: `${data?.timestamp}`,
           mesId: `${data?.mesId}`,
           typ: `${data?.typ}`,
         },
