@@ -12,6 +12,29 @@ const mongoose = require("mongoose");
 const User = require("./models/User");
 const Topic = require("./models/topic");
 const Message = require("./models/message");
+const Minio = require("minio");
+const minioClient = new Minio.Client({
+  endPoint: "minio.grovyo.xyz",
+
+  useSSL: true,
+  accessKey: "shreyansh379",
+  secretKey: "shreyansh379",
+});
+
+//function to ge nerate a presignedurl of minio
+async function generatePresignedUrl(bucketName, objectName, expiry = 604800) {
+  try {
+    const presignedUrl = await minioClient.presignedGetObject(
+      bucketName,
+      objectName,
+      expiry
+    );
+    return presignedUrl;
+  } catch (err) {
+    console.error(err);
+    throw new Error("Failed to generate presigned URL");
+  }
+}
 
 require("dotenv").config();
 
@@ -139,10 +162,56 @@ function getRoomByName(roomName) {
   return rooms.find((r) => r.name === roomName);
 }
 
+//user
+let users = [];
+
+const addUser = ({ userId, socketId }) => {
+  const existingUserIndex = users.findIndex((user) => user.userId === userId);
+
+  if (existingUserIndex === -1) {
+    users.push({ userId, socketId, isactive: true });
+  } else {
+    users[existingUserIndex].socketId = socketId;
+    users[existingUserIndex].isactive = true;
+  }
+};
+
+const updateUserLeaveTime = ({ socketId }) => {
+  const userIndex = users.findIndex((user) => user.socketId === socketId);
+
+  if (userIndex !== -1) {
+    users[userIndex].isactive = new Date();
+  }
+};
+
+const removeUser = ({ socketId }) => {
+  const userIndexToRemove = users.findIndex(
+    (user) => user.socketId === socketId
+  );
+
+  if (userIndexToRemove !== -1) {
+    users.splice(userIndexToRemove, 1);
+  }
+};
+
+const isUserthere = ({ userId }) => {
+  return users.some((user) => user.userId === userId);
+};
+
 io.on("connection", (socket) => {
+  socket.on("joinUser", ({ userId, roomId }) => {
+    console.log("user joined", userId, socket.id);
+    socket.join(roomId);
+    addUser({ userId, socketId: socket.id });
+    addUserToRoom(roomId, userId, socket.id);
+  });
+
   socket.on("joinRoom", ({ roomId, userId }) => {
     socket.join(roomId);
     addUserToRoom(roomId, userId, socket.id);
+    // const isthere = isUserthere({ socketId: socket.id });
+    // console.log(isthere, "alive");
+    socket.to(roomId).emit("online", true);
   });
 
   socket.on("switchRoom", async ({ prevRoom, newRoom, userId }) => {
@@ -180,12 +249,13 @@ io.on("connection", (socket) => {
       sendNotifcation(data);
     }
   });
-  socket.on("singleChatMessage", async ({ roomId, userId, data }) => {
+  socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
     if (usercheck) {
       console.log("sent", roomId);
       socket.join(roomId);
       socket.to(roomId).emit("ms", data);
+      socket.to(userId).emit("allchats", ext);
       SaveChats(data);
       sendNoti(data);
     } else {
@@ -193,23 +263,26 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       addUserToRoom(roomId, userId, socket.id);
       socket.to(roomId).emit("ms", data);
+      socket.to(userId).emit("allchats", ext);
       SaveChats(data);
       sendNoti(data);
     }
   });
 
-  socket.on("singleChatContent", async ({ roomId, userId, data }) => {
+  socket.on("singleChatContent", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
     if (usercheck) {
       console.log("sent", roomId);
       socket.join(roomId);
       socket.to(roomId).emit("ms", data);
+      socket.to(userId).emit("allchats", ext);
       sendNoti(data);
     } else {
       console.log("joined and sent");
       socket.join(roomId);
       addUserToRoom(roomId, userId, socket.id);
       socket.to(roomId).emit("ms", data);
+      socket.to(userId).emit("allchats", ext);
       sendNoti(data);
     }
   });
@@ -221,6 +294,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
+    updateUserLeaveTime({ socketId: socket.id });
   });
 });
 
@@ -348,6 +422,7 @@ const SaveChats = async (data) => {
       isread: data?.isread,
       sequence: data?.sequence,
       timestamp: data?.timestamp,
+      replyId: data?.replyId,
     });
     await message.save();
     console.log("Saved");
@@ -405,7 +480,7 @@ const sendNoti = async (data) => {
               : data?.text,
         },
         data: {
-          screen: "Chats",
+          screen: "Convs",
           sender_fullname: `${data?.sender_fullname}`,
           sender_id: `${data?.sender_id}`,
           text:
@@ -420,6 +495,12 @@ const sendNoti = async (data) => {
           createdAt: `${data?.timestamp}`,
           mesId: `${data?.mesId}`,
           typ: `${data?.typ}`,
+          mypic: `${data?.mypic}`,
+          reciever_fullname: `${user.fullname}`,
+          reciever_username: `${user.username}`,
+          reciever_isverified: `${user.isverified}`,
+          reciever_pic: `${data?.reciever_pic}`,
+          reciever_id: `${user._id}`,
         },
         token: user?.notificationtoken,
       };

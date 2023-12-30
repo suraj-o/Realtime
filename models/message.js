@@ -42,6 +42,7 @@ const messageSchema = new mongoose.Schema(
     doc: { type: String },
     contact: { type: String },
     reply: { type: String },
+    replyId: { type: Number },
     comId: { type: ObjectId, ref: "Community" },
     sequence: { type: Number },
     timestamp: { type: String },
