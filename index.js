@@ -98,6 +98,48 @@ function removeUserFromRoom(roomName, userId) {
   }
 }
 
+function removeUserFromAllRoomsBySocketId({ socketId }) {
+  rooms.forEach((room, roomIndex) => {
+    const userIndex = room.users.findIndex(
+      (user) => user.socketId === socketId
+    );
+
+    if (userIndex !== -1) {
+      room.users.splice(userIndex, 1);
+
+      // If the room becomes empty after removing the user, remove the entire room
+      if (room.users.length === 0) {
+        rooms.splice(roomIndex, 1);
+      }
+
+      console.log(
+        `User with socket ID ${socketId} removed from room ${room.name}`
+      );
+    }
+  });
+}
+
+function removeUserFromRoomBySocketId(socketId) {
+  rooms.forEach((room, roomIndex) => {
+    const userIndex = room.users.findIndex(
+      (user) => user.socketId === socketId
+    );
+
+    if (userIndex !== -1) {
+      room.users.splice(userIndex, 1);
+
+      // If the room becomes empty after removing the user, remove the entire room
+      if (room.users.length === 0) {
+        rooms.splice(roomIndex, 1);
+      }
+
+      console.log(
+        `User with socket ID ${socketId} removed from room ${room.name}`
+      );
+    }
+  });
+}
+
 function removeUserFromRoombysktid({ roomName, userId, socketId }) {
   const roomIndex = rooms.findIndex((r) => r.name === roomName);
 
@@ -123,6 +165,7 @@ function removeUserFromRoombysktid({ roomName, userId, socketId }) {
 
 function isUserInRoom({ roomName, userId }) {
   let room = rooms.find((r) => r.name === roomName);
+
   return room ? room.users.some((user) => user.userId === userId) : false;
 }
 
@@ -206,6 +249,12 @@ io.on("connection", (socket) => {
     addUserToRoom(roomId, userId, socket.id);
   });
 
+  socket.on("isUserInRoom", ({ userId, roomId }) => {
+    const isuser = isUserInRoom({ roomName: roomId, userId: userId });
+
+    io.to(socket.id).emit("checkit", isuser);
+  });
+
   socket.on("joinRoom", ({ roomId, userId }) => {
     socket.join(roomId);
     addUserToRoom(roomId, userId, socket.id);
@@ -252,7 +301,7 @@ io.on("connection", (socket) => {
   socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
     if (usercheck) {
-      console.log("sent", roomId);
+      console.log("sent to", userId);
       socket.join(roomId);
       socket.to(roomId).emit("ms", data);
       socket.to(userId).emit("allchats", ext);
@@ -295,6 +344,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
     updateUserLeaveTime({ socketId: socket.id });
+    removeUserFromAllRoomsBySocketId({ socketId: socket.id });
   });
 });
 
@@ -426,6 +476,7 @@ const SaveChats = async (data) => {
     });
     await message.save();
     console.log("Saved");
+
     // await User.updateOne(
     //   { _id: data?.reciever },
     //   { $push: { mesIds: data?.mesId } }
@@ -467,6 +518,19 @@ const sendNoti = async (data) => {
     const user = await User.findById(data?.reciever);
 
     if (user) {
+      //checking if the rec has conv after deletion or not
+      const rec = await User.findById(data?.reciever);
+      if (rec?.conversations.includes(data?.convId)) {
+      } else {
+        await User.updateOne(
+          { _id: rec._id },
+          {
+            $push: {
+              conversations: data?.convId,
+            },
+          }
+        );
+      }
       const message = {
         notification: {
           title: data?.sender_fullname,
