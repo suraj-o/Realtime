@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxLength: 50,
     },
+    muted: [{ type: ObjectId, ref: "Conversation" }],
     hashed_password: {
       type: String,
     },

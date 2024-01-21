@@ -260,6 +260,10 @@ io.on("connection", (socket) => {
     addUserToRoom(roomId, userId, socket.id);
     // const isthere = isUserthere({ socketId: socket.id });
     // console.log(isthere, "alive");
+
+    //marking msgs as seen while entering the room
+    socket.to(roomId).emit("readconvs", userId);
+
     socket.to(roomId).emit("online", true);
   });
 
@@ -300,40 +304,97 @@ io.on("connection", (socket) => {
   });
   socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
-    if (usercheck) {
-      console.log("sent to", userId);
-      socket.join(roomId);
-      socket.to(roomId).emit("ms", data);
-      socket.to(userId).emit("allchats", ext);
-      SaveChats(data);
-      sendNoti(data);
-    } else {
-      console.log("joined and sent");
-      socket.join(roomId);
-      addUserToRoom(roomId, userId, socket.id);
-      socket.to(roomId).emit("ms", data);
-      socket.to(userId).emit("allchats", ext);
-      SaveChats(data);
-      sendNoti(data);
+    const rec = await User.findById(data?.reciever);
+    const sender = await User.findById(data?.sender_id);
+
+    let isblocked = false;
+    rec.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === sender._id.toString()) {
+        isblocked = true;
+      }
+    });
+    sender.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === rec._id.toString()) {
+        isblocked = true;
+      }
+    });
+    SaveChats(data);
+    if (isblocked === false) {
+      if (usercheck) {
+        console.log("sent to", userId);
+        socket.join(roomId);
+        socket.to(roomId).emit("ms", data);
+        socket.to(userId).emit("allchats", ext);
+
+        sendNoti(data);
+      } else {
+        console.log("joined and sent");
+        socket.join(roomId);
+        addUserToRoom(roomId, userId, socket.id);
+        socket.to(roomId).emit("ms", data);
+        socket.to(userId).emit("allchats", ext);
+
+        sendNoti(data);
+      }
     }
+  });
+
+  //typing status convsersations
+  socket.on("typing", async ({ roomId, id, userId, status }) => {
+    let data = { id: userId, status, convId: roomId };
+    socket.to(roomId).emit("istyping", data);
+    socket.to(id).emit("istypingext", data);
+  });
+  //deleting for everyone conversations
+  socket.on("deleteforeveryone", async ({ roomId, userId, data }) => {
+    socket.to(roomId).emit("deleted", data);
+    socket.to(userId).emit("deletedext", data);
+  });
+
+  //for instant read msg
+  socket.on("readnow", async ({ userId, roomId }) => {
+    socket.to(roomId).emit("readconvs", userId);
+    console.log("read", userId);
   });
 
   socket.on("singleChatContent", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
-    if (usercheck) {
-      console.log("sent", roomId);
-      socket.join(roomId);
-      socket.to(roomId).emit("ms", data);
-      socket.to(userId).emit("allchats", ext);
-      sendNoti(data);
-    } else {
-      console.log("joined and sent");
-      socket.join(roomId);
-      addUserToRoom(roomId, userId, socket.id);
-      socket.to(roomId).emit("ms", data);
-      socket.to(userId).emit("allchats", ext);
-      sendNoti(data);
+
+    const rec = await User.findById(data?.reciever);
+    const sender = await User.findById(data?.sender_id);
+
+    let isblocked = false;
+    rec.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === sender._id.toString()) {
+        isblocked = true;
+      }
+    });
+    sender.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === rec._id.toString()) {
+        isblocked = true;
+      }
+    });
+    if (isblocked === false) {
+      if (usercheck) {
+        console.log("sent", roomId);
+        socket.join(roomId);
+        socket.to(roomId).emit("ms", data);
+        socket.to(userId).emit("allchats", ext);
+        sendNoti(data);
+      } else {
+        console.log("joined and sent");
+        socket.join(roomId);
+        addUserToRoom(roomId, userId, socket.id);
+        socket.to(roomId).emit("ms", data);
+        socket.to(userId).emit("allchats", ext);
+        sendNoti(data);
+      }
     }
+  });
+
+  socket.on("blockperson", ({ roomId, userId, action }) => {
+    let data = { id: userId, action };
+    socket.to(roomId).emit("afterblock", data);
   });
 
   socket.on("leaveRoom", ({ roomId, userId }) => {
@@ -531,52 +592,54 @@ const sendNoti = async (data) => {
           }
         );
       }
-      const message = {
-        notification: {
-          title: data?.sender_fullname,
-          body:
-            data?.typ === "image"
-              ? "Image"
-              : data?.typ === "video"
-              ? "Video"
-              : data?.typ === "doc"
-              ? "Document"
-              : data?.text,
-        },
-        data: {
-          screen: "Convs",
-          sender_fullname: `${data?.sender_fullname}`,
-          sender_id: `${data?.sender_id}`,
-          text:
-            data?.type === "image"
-              ? "Image"
-              : data?.typ === "video"
-              ? "Video"
-              : data?.typ === "doc"
-              ? "Document"
-              : `${data?.text}`,
-          convId: `${data?.convId}`,
-          createdAt: `${data?.timestamp}`,
-          mesId: `${data?.mesId}`,
-          typ: `${data?.typ}`,
-          mypic: `${data?.mypic}`,
-          reciever_fullname: `${user.fullname}`,
-          reciever_username: `${user.username}`,
-          reciever_isverified: `${user.isverified}`,
-          reciever_pic: `${data?.reciever_pic}`,
-          reciever_id: `${user._id}`,
-        },
-        token: user?.notificationtoken,
-      };
-      await admin
-        .messaging()
-        .send(message)
-        .then((response) => {
-          console.log("Successfully sent message");
-        })
-        .catch((error) => {
-          console.log("Error sending message:", error);
-        });
+      if (!rec?.muted?.includes(data?.convId)) {
+        const message = {
+          notification: {
+            title: data?.sender_fullname,
+            body:
+              data?.typ === "image"
+                ? "Image"
+                : data?.typ === "video"
+                ? "Video"
+                : data?.typ === "doc"
+                ? "Document"
+                : data?.text,
+          },
+          data: {
+            screen: "Convs",
+            sender_fullname: `${data?.sender_fullname}`,
+            sender_id: `${data?.sender_id}`,
+            text:
+              data?.type === "image"
+                ? "Image"
+                : data?.typ === "video"
+                ? "Video"
+                : data?.typ === "doc"
+                ? "Document"
+                : `${data?.text}`,
+            convId: `${data?.convId}`,
+            createdAt: `${data?.timestamp}`,
+            mesId: `${data?.mesId}`,
+            typ: `${data?.typ}`,
+            mypic: `${data?.mypic}`,
+            reciever_fullname: `${user.fullname}`,
+            reciever_username: `${user.username}`,
+            reciever_isverified: `${user.isverified}`,
+            reciever_pic: `${data?.reciever_pic}`,
+            reciever_id: `${user._id}`,
+          },
+          token: user?.notificationtoken,
+        };
+        await admin
+          .messaging()
+          .send(message)
+          .then((response) => {
+            console.log("Successfully sent message");
+          })
+          .catch((error) => {
+            console.log("Error sending message:", error);
+          });
+      }
     }
   } catch (e) {
     console.log(e);
