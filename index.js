@@ -342,19 +342,34 @@ io.on("connection", (socket) => {
   //typing status convsersations
   socket.on("typing", async ({ roomId, id, userId, status }) => {
     let data = { id: userId, status, convId: roomId };
+
+    socket.join(userId); //person who is typing
     socket.to(roomId).emit("istyping", data);
     socket.to(id).emit("istypingext", data);
   });
   //deleting for everyone conversations
   socket.on("deleteforeveryone", async ({ roomId, userId, data }) => {
+    socket.join(roomId);
     socket.to(roomId).emit("deleted", data);
     socket.to(userId).emit("deletedext", data);
   });
 
   //for instant read msg
-  socket.on("readnow", async ({ userId, roomId }) => {
-    socket.to(roomId).emit("readconvs", userId);
-    console.log("read", userId);
+  socket.on("readnow", async ({ userId, roomId, mesId }) => {
+    let data = { id: userId, mesId };
+    socket.to(roomId).emit("readconvs", data);
+    console.log("read", data?.id);
+  });
+
+  //read success callback
+  socket.on("successreadnow", async ({ userId, roomId, mesId }) => {
+    console.log(userId, roomId, mesId, "success read");
+    if (mesId) {
+      await Message.updateOne(
+        { mesId: mesId },
+        { $addToSet: { readby: userId } }
+      );
+    }
   });
 
   socket.on("singleChatContent", async ({ roomId, userId, data, ext }) => {
@@ -394,6 +409,7 @@ io.on("connection", (socket) => {
 
   socket.on("blockperson", ({ roomId, userId, action }) => {
     let data = { id: userId, action };
+    console.log(roomId, userId, "block");
     socket.to(roomId).emit("afterblock", data);
   });
 
@@ -603,6 +619,8 @@ const sendNoti = async (data) => {
                 ? "Video"
                 : data?.typ === "doc"
                 ? "Document"
+                : data?.typ === "glimpse"
+                ? "Glimpse"
                 : data?.text,
           },
           data: {
@@ -650,30 +668,24 @@ const sendNoti = async (data) => {
 const sendNotifcation = async (data) => {
   try {
     const topic = await Topic.findById(data?.sendtopicId).populate({
-      path: "members",
+      path: "notifications.id",
       model: "User",
       select: "notificationtoken",
     });
-    // const subscribedTokens = topic?.notificationtoken?.filter(
-    //   (token) => token?.subscribed === true
-    // );
-    // const subscribedTokens = (topic?.notificationtoken || [])
-    //   .filter((token) => token.subscribed === true)
-    //   .map((token) => token.token);
 
-    // const subscribedTokens = topic?.notifications?.map(
-    //   (t) => t.notificationtoken
-    // );
-
-    const subscribedTokens = topic?.members?.map((t) => t.notificationtoken);
+    const subscribedTokens = topic?.notifications?.map((t) =>
+      t?.muted === true ? null : t.id.notificationtoken
+    );
     let tokens = [];
 
     if (Array.isArray(subscribedTokens) && subscribedTokens.length > 0) {
       for (const token of subscribedTokens) {
         try {
-          tokens.push(token);
+          if (token !== null) {
+            tokens.push(token);
+          }
         } catch (error) {
-          console.error(
+          console.log(
             `Error sending notification to token ${token}:`,
             error.message
           );
@@ -682,37 +694,42 @@ const sendNotifcation = async (data) => {
     } else {
       console.warn("No valid tokens to send notifications.");
     }
-    const message = {
-      notification: {
-        title: data?.comtitle,
-        body: `${data?.sender_fullname}: ${data?.text}`,
-      },
-      data: {
-        screen: "ComChat",
-        sender_fullname: `${data?.sender_fullname}`,
-        sender_id: `${data?.sender_id}`,
-        text: `${data?.text}`,
-        topicId: `${data?.topicId}`,
-        createdAt: `${data?.timestamp}`,
-        mesId: `${data?.mesId}`,
-        typ: `${data?.typ}`,
-        comId: `${data?.comId}`,
-        props: `${data?.props}`,
-        sendtopicId: `${data?.sendtopicId}`,
-        postId: `${data?.postId}`,
-      },
-      tokens: tokens,
-    };
 
-    await admin
-      .messaging()
-      .sendEachForMulticast(message)
-      .then((response) => {
-        console.log("Successfully sent message");
-      })
-      .catch((error) => {
-        console.log("Error sending message:", error);
-      });
+    if (tokens?.length > 0) {
+      const message = {
+        notification: {
+          title: data?.comtitle,
+          body: `${data?.sender_fullname}: ${data?.text}`,
+        },
+        data: {
+          screen: "ComChat",
+          sender_fullname: `${data?.sender_fullname}`,
+          sender_id: `${data?.sender_id}`,
+          text: `${data?.text}`,
+          topicId: `${data?.topicId}`,
+          createdAt: `${data?.timestamp}`,
+          mesId: `${data?.mesId}`,
+          typ: `${data?.typ}`,
+          comId: `${data?.comId}`,
+          props: `${data?.props}`,
+          sendtopicId: `${data?.sendtopicId}`,
+          postId: `${data?.postId}`,
+        },
+        tokens: tokens,
+      };
+
+      await admin
+        .messaging()
+        .sendEachForMulticast(message)
+        .then((response) => {
+          console.log("Successfully sent message");
+        })
+        .catch((error) => {
+          console.log("Error sending message:", error);
+        });
+    } else {
+      console.log("no notifications");
+    }
   } catch (e) {
     console.log(e);
   }

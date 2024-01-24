@@ -15,8 +15,8 @@ const topicSchema = new mongoose.Schema(
     message: { type: String },
     notifications: [
       {
-        type: ObjectId,
-        ref: "User",
+        id: { type: ObjectId, ref: "User" },
+        muted: { type: Boolean, default: false },
       },
     ],
   },

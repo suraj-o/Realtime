@@ -36,7 +36,14 @@ const messageSchema = new mongoose.Schema(
     ],
     voted: [{ type: ObjectId, ref: "User" }],
     expression: { type: String },
-    content: { type: String },
+    content: {
+      uri: { type: String },
+      type: { type: String },
+      size: { type: String },
+      thumbnail: { type: String },
+      name: { type: String },
+    },
+    deletedfor: [{ type: ObjectId, ref: "User" }],
     video: { type: String },
     audio: { type: String },
     doc: { type: String },
@@ -47,8 +54,13 @@ const messageSchema = new mongoose.Schema(
     sequence: { type: Number },
     timestamp: { type: String },
     isread: { type: Boolean, default: false },
+    readby: [{ type: ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
+
+messageSchema.index({ mesId: "Regular" });
+messageSchema.index({ topicId: "Regular" });
+messageSchema.index({ sequence: "Regular" });
 
 module.exports = mongoose.model("Message", messageSchema);
