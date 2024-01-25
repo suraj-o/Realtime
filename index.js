@@ -593,7 +593,12 @@ const savemsg = async (data) => {
 const sendNoti = async (data) => {
   try {
     const user = await User.findById(data?.reciever);
-
+    //getting user profilepic
+    const recpic = await generatePresignedUrl(
+      "images",
+      user.profilepic?.toString(),
+      60 * 60
+    );
     if (user) {
       //checking if the rec has conv after deletion or not
       const rec = await User.findById(data?.reciever);
@@ -634,6 +639,8 @@ const sendNoti = async (data) => {
                 ? "Video"
                 : data?.typ === "doc"
                 ? "Document"
+                : data?.typ === "glimpse"
+                ? "Glimpse"
                 : `${data?.text}`,
             convId: `${data?.convId}`,
             createdAt: `${data?.timestamp}`,
@@ -643,7 +650,7 @@ const sendNoti = async (data) => {
             reciever_fullname: `${user.fullname}`,
             reciever_username: `${user.username}`,
             reciever_isverified: `${user.isverified}`,
-            reciever_pic: `${data?.reciever_pic}`,
+            reciever_pic: `${recpic}`,
             reciever_id: `${user._id}`,
           },
           token: user?.notificationtoken,
