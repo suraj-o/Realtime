@@ -646,6 +646,7 @@ const sendNoti = async (data) => {
             createdAt: `${data?.timestamp}`,
             mesId: `${data?.mesId}`,
             typ: `${data?.typ}`,
+            senderverification: `${sender.isverified}`,
             senderpic: `${senderpic}`,
             reciever_fullname: `${user.fullname}`,
             reciever_username: `${user.username}`,
