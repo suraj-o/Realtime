@@ -624,7 +624,7 @@ const sendNoti = async (data) => {
                 : data?.text,
           },
           data: {
-            screen: "Convs",
+            screen: "Conversation",
             sender_fullname: `${data?.sender_fullname}`,
             sender_id: `${data?.sender_id}`,
             text:
