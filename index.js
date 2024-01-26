@@ -262,7 +262,8 @@ io.on("connection", (socket) => {
     // console.log(isthere, "alive");
 
     //marking msgs as seen while entering the room
-    socket.to(roomId).emit("readconvs", userId);
+    let data = { id: userId };
+    socket.to(roomId).emit("readconvs", data);
 
     socket.to(roomId).emit("online", true);
   });
