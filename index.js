@@ -11,7 +11,9 @@ const admin = require("firebase-admin");
 const mongoose = require("mongoose");
 const User = require("./models/User");
 const Topic = require("./models/topic");
+const Admin = require("./models/admin");
 const Message = require("./models/message");
+const Post = require("./models/post");
 const Minio = require("minio");
 const minioClient = new Minio.Client({
   endPoint: "minio.grovyo.xyz",
@@ -249,6 +251,58 @@ io.on("connection", (socket) => {
     addUserToRoom(roomId, userId, socket.id);
   });
 
+  //for marking active users
+  socket.on("activeuser", async ({ userId, roomId }) => {
+    socket.join(roomId);
+    addUser({ userId, socketId: socket.id });
+    addUserToRoom(roomId, userId, socket.id);
+    console.log("active user:", userId);
+    let today = new Date();
+
+    let year = today.getFullYear();
+    let month = String(today.getMonth() + 1).padStart(2, "0");
+    let day = String(today.getDate()).padStart(2, "0");
+
+    let formattedDate = `${day}/${month}/${year}`;
+
+    const activity = await Admin.findOne({ date: formattedDate });
+    if (activity) {
+      //visitor count
+      if (activity.users.includes(userId)) {
+        await Admin.updateOne(
+          { _id: activity._id },
+          {
+            $addToSet: {
+              returning: userId,
+            },
+            $inc: {
+              returningcount: 1,
+            },
+          }
+        );
+      } else {
+        await Admin.updateOne(
+          { _id: activity._id },
+          {
+            $addToSet: {
+              users: userId,
+            },
+            $inc: {
+              activeuser: 1,
+            },
+          }
+        );
+      }
+    } else {
+      const a = new Admin({
+        date: formattedDate,
+        activeuser: 1,
+        users: userId,
+      });
+      await a.save();
+    }
+  });
+
   socket.on("isUserInRoom", ({ userId, roomId }) => {
     const isuser = isUserInRoom({ roomName: roomId, userId: userId });
 
@@ -370,6 +424,38 @@ io.on("connection", (socket) => {
         { mesId: mesId },
         { $addToSet: { readby: userId } }
       );
+    }
+  });
+
+  //recording views
+  socket.on("emitviews", async ({ postId }) => {
+    try {
+      const post = await Post.findById(postId);
+      if (post) {
+        if (post.kind === "ad") {
+          await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
+        } else {
+          await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
+        }
+      } else {
+        console.log("error inc views");
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  });
+
+  //inc share count
+  socket.on("incshare", async ({ postId }) => {
+    try {
+      const post = await Post.findById(postId);
+      if (post) {
+        await Post.updateOne({ _id: post._id }, { $inc: { sharescount: 1 } });
+      } else {
+        console.log("error inc shares");
+      }
+    } catch (e) {
+      console.log(e);
     }
   });
 
