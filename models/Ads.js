@@ -14,6 +14,12 @@ const AdsSchema = new mongoose.Schema(
     category: { type: String },
     cta: { type: String },
     ctalink: { type: String },
+    totalspent: { type: Number, default: 0 },
+    views: { type: Number, default: 0 },
+    impressions: { type: Number, default: 0 },
+    cpc: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 },
+    stopreason: { type: String },
     // content: [{ extension: { type: String }, name: { type: String } }],
     post: [
       {

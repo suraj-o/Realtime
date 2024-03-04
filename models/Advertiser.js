@@ -38,6 +38,7 @@ const AdvertiserSchema = new mongoose.Schema(
         totalvisitors: { type: Number },
       },
     ],
+    totalspent: { type: Number, default: 0 },
     verificationstatus: { type: String, default: "unverified" },
     advertiserid: { type: String, unique: true },
     image: { type: String },

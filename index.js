@@ -446,7 +446,7 @@ io.on("connection", (socket) => {
   });
 
   //rec ads
-  socket.on("adviews", async ({ postId, imp, view, click, userId }) => {
+  socket.on("adviews", async ({ postId, imp, view, click, userId, inside }) => {
     try {
       const post = await Post.findById(postId);
       if (post) {
@@ -465,11 +465,13 @@ io.on("connection", (socket) => {
 
         const ad = await Ads.findById(post.promoid);
         const user = await User.findById(userId);
+        const advertiser = await Advertiser.findById(ad.advertiserid);
 
         if (
           ad &&
           new Date(ad?.enddate) >= new Date() &&
-          ad.status !== "stopped"
+          ad.status !== "stopped" &&
+          advertiser
         ) {
           //calulating price
           function calculateAdRate(ad) {
@@ -515,14 +517,30 @@ io.on("connection", (socket) => {
 
           const adRate = calculateAdRate(ad1);
 
-          if (parseInt(adRate) > parseInt(ad?.totalbudget)) {
+          if (
+            parseInt(adRate) > parseInt(advertiser.currentbalance) &&
+            parseInt(ad.totalbudget) < parseInt(ad.totalspent)
+          ) {
             await Ads.updateOne(
               { _id: ad._id },
-              { $set: { status: "stopped" } }
+              { $set: { status: "stopped", stopreason: "Low Balance" } }
             );
             await Post.updateOne({ _id: post._id }, { $set: { kind: "post" } });
           } else {
             //updating ad stats
+            await Ads.updateOne(
+              { _id: ad._id },
+              {
+                $inc: {
+                  totalspent: adRate,
+                  views: view ? view : 0,
+                  clicks: click ? click : 0,
+                  impressions: imp ? imp : 0,
+                  cpc: click / adRate || 0,
+                },
+              }
+            );
+
             if (latestana) {
               await Analytics.updateOne(
                 { _id: latestana._id },
@@ -530,11 +548,10 @@ io.on("connection", (socket) => {
                   $inc: {
                     impressions: imp ? imp : 0,
                     views: view ? view : 0,
-
+                    cpc: click / adRate || 0,
                     cost: adRate,
                     click: click ? click : 0,
                   },
-                  $set: { cpc: click / adRate },
                 }
               );
             } else {
@@ -543,35 +560,42 @@ io.on("connection", (socket) => {
                 id: post.promoid,
                 impressions: imp ? imp : 0,
                 views: view ? view : 0,
-                cpc: click / adRate,
+                cpc: click / adRate || 0,
                 cost: adRate,
                 click: click ? click : 0,
               });
               await an.save();
             }
 
-            //giving 90% to creator
-            let moneytocreator = (adRate / 100) * 90;
-
             //updating creator stats
             const com = await Community.findById(post.community);
             if (com) {
-              if (com.ismonetized === true) {
-                let earning = { how: "Ads", when: Date.now() };
+              if (com.ismonetized === true && inside) {
+                //giving 90% to creator
+                let moneytocreator = (adRate / 100) * 90;
+
+                let earned = { how: "Ads", when: Date.now() };
                 await User.updateOne(
                   { _id: com.creator },
                   {
                     $inc: { adsearning: moneytocreator },
-                    $addToSet: { earningtype: earning },
+                    $push: { earningtype: earned },
                   }
                 );
               }
             }
 
+            let amtspt = {
+              date: Date.now(),
+              amount: adRate,
+            };
             //deducting the amount from the advertiser
             await Advertiser.updateOne(
               { _id: ad.advertiserid },
-              { $inc: { currentbalance: -adRate } }
+              {
+                $inc: { currentbalance: -adRate },
+                $push: { amountspent: amtspt },
+              }
             );
 
             //amount spend- advertiser and total earning- creayrp
