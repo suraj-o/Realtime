@@ -573,6 +573,7 @@ io.on("connection", (socket) => {
               if (com.ismonetized === true && inside) {
                 //giving 90% to creator
                 let moneytocreator = (adRate / 100) * 90;
+                let moneytocompany = (adRate / 100) * 10;
 
                 let earned = { how: "Ads", when: Date.now() };
                 await User.updateOne(
@@ -580,6 +581,34 @@ io.on("connection", (socket) => {
                   {
                     $inc: { adsearning: moneytocreator },
                     $push: { earningtype: earned },
+                  }
+                );
+
+                let earning = {
+                  how: "Ads",
+                  amount: moneytocompany,
+                  when: Date.now(),
+                  id: ad._id,
+                };
+                await Admin.updateOne(
+                  { date: formattedDate },
+                  {
+                    $inc: { todayearning: moneytocompany },
+                    $push: { earningtype: earning },
+                  }
+                );
+              } else {
+                let earning = {
+                  how: "Ads",
+                  amount: adRate,
+                  when: Date.now(),
+                  id: ad._id,
+                };
+                await Admin.updateOne(
+                  { date: formattedDate },
+                  {
+                    $inc: { todayearning: adRate },
+                    $push: { earningtype: earning },
                   }
                 );
               }
@@ -597,8 +626,6 @@ io.on("connection", (socket) => {
                 $push: { amountspent: amtspt },
               }
             );
-
-            //amount spend- advertiser and total earning- creayrp
           }
 
           await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });

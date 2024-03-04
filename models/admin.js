@@ -8,6 +8,15 @@ const Adminschema = new mongoose.Schema(
     activeuser: { type: Number, default: 0 },
     returning: [{ type: ObjectId, ref: "User" }],
     returningcount: { type: Number, default: 0 },
+    todayearning: { type: Number, default: 0 },
+    earningtype: [
+      {
+        how: { type: String },
+        amount: { type: Number, default: 0 },
+        when: { type: String },
+        id: { type: String },
+      },
+    ],
   },
   { timestamps: false }
 );
