@@ -11,8 +11,12 @@ const admin = require("firebase-admin");
 const mongoose = require("mongoose");
 const User = require("./models/User");
 const Topic = require("./models/topic");
+const Community = require("./models/community");
 const Admin = require("./models/admin");
+const Ads = require("./models/Ads");
 const Message = require("./models/message");
+const Analytics = require("./models/Analytics");
+const Advertiser = require("./models/Advertiser");
 const Post = require("./models/post");
 const Minio = require("minio");
 const minioClient = new Minio.Client({
@@ -432,9 +436,147 @@ io.on("connection", (socket) => {
     try {
       const post = await Post.findById(postId);
       if (post) {
-        if (post.kind === "ad") {
-          await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
-        } else {
+        await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
+      } else {
+        console.log("error inc views");
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  });
+
+  //rec ads
+  socket.on("adviews", async ({ postId, imp, view, click, userId }) => {
+    try {
+      const post = await Post.findById(postId);
+      if (post) {
+        let today = new Date();
+
+        let year = today.getFullYear();
+        let month = String(today.getMonth() + 1).padStart(2, "0");
+        let day = String(today.getDate()).padStart(2, "0");
+
+        let formattedDate = `${day}/${month}/${year}`;
+
+        const latestana = await Analytics.findOne({
+          date: formattedDate,
+          id: post.promoid,
+        });
+
+        const ad = await Ads.findById(post.promoid);
+        const user = await User.findById(userId);
+
+        if (
+          ad &&
+          new Date(ad?.enddate) >= new Date() &&
+          ad.status !== "stopped"
+        ) {
+          //calulating price
+          function calculateAdRate(ad) {
+            const costs = {
+              gender: { male: 3, female: 2 },
+              audience: {
+                Sales: 9,
+                Awareness: 5,
+                Clicks: 10,
+                Views: 4,
+                Downloads: 8,
+              },
+              type: { banner: 3, skipable: 7, "non-skipable": 9, infeed: 5 },
+            };
+
+            let adRate = 0;
+
+            if (ad && ad.type && costs.type.hasOwnProperty(ad.type)) {
+              adRate += costs.type[ad.type];
+
+              if (ad.gender && costs.gender.hasOwnProperty(ad.gender)) {
+                adRate += costs.gender[ad.gender] || 5;
+              }
+
+              if (ad.audience && costs.audience.hasOwnProperty(ad.audience)) {
+                adRate += costs.audience[ad.audience];
+              }
+
+              // if (ad.totalbudget) {
+              //   adRate *= parseInt(ad.totalbudget);
+              // }
+            }
+
+            return adRate;
+          }
+
+          const ad1 = {
+            type: ad.type,
+            gender: user?.gender,
+            audience: ad.goal,
+            totalbudget: ad?.totalbudget,
+          };
+
+          const adRate = calculateAdRate(ad1);
+
+          if (parseInt(adRate) > parseInt(ad?.totalbudget)) {
+            await Ads.updateOne(
+              { _id: ad._id },
+              { $set: { status: "stopped" } }
+            );
+            await Post.updateOne({ _id: post._id }, { $set: { kind: "post" } });
+          } else {
+            //updating ad stats
+            if (latestana) {
+              await Analytics.updateOne(
+                { _id: latestana._id },
+                {
+                  $inc: {
+                    impressions: imp ? imp : 0,
+                    views: view ? view : 0,
+
+                    cost: adRate,
+                    click: click ? click : 0,
+                  },
+                  $set: { cpc: click / adRate },
+                }
+              );
+            } else {
+              const an = new Analytics({
+                date: formattedDate,
+                id: post.promoid,
+                impressions: imp ? imp : 0,
+                views: view ? view : 0,
+                cpc: click / adRate,
+                cost: adRate,
+                click: click ? click : 0,
+              });
+              await an.save();
+            }
+
+            //giving 90% to creator
+            let moneytocreator = (adRate / 100) * 90;
+
+            //updating creator stats
+            const com = await Community.findById(post.community);
+            if (com) {
+              if (com.ismonetized === true) {
+                let earning = { how: "Ads", when: Date.now() };
+                await User.updateOne(
+                  { _id: com.creator },
+                  {
+                    $inc: { adsearning: moneytocreator },
+                    $addToSet: { earningtype: earning },
+                  }
+                );
+              }
+            }
+
+            //deducting the amount from the advertiser
+            await Advertiser.updateOne(
+              { _id: ad.advertiserid },
+              { $inc: { currentbalance: -adRate } }
+            );
+
+            //amount spend- advertiser and total earning- creayrp
+          }
+
           await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
         }
       } else {
