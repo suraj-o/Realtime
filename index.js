@@ -874,11 +874,7 @@ const sendNoti = async (data) => {
   try {
     const user = await User.findById(data?.reciever);
     const sender = await User.findById(data?.sender_id);
-    const senderpic = await generatePresignedUrl(
-      "images",
-      sender.profilepic.toString(),
-      60 * 60
-    );
+    const senderpic = process.env.URL + sender.profilepic;
     if (user) {
       //checking if the rec has conv after deletion or not
       const rec = await User.findById(data?.reciever);
