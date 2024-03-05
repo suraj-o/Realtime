@@ -566,7 +566,7 @@ io.on("connection", (socket) => {
               });
               await an.save();
             }
-
+            console.log(adRate);
             //updating creator stats
             const com = await Community.findById(post.community);
             if (com) {
