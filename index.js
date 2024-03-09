@@ -518,7 +518,7 @@ io.on("connection", (socket) => {
           const adRate = calculateAdRate(ad1);
 
           if (
-            parseInt(adRate) > parseInt(advertiser.currentbalance) &&
+            parseInt(adRate) > parseInt(advertiser.currentbalance) ||
             parseInt(ad.totalbudget) < parseInt(ad.totalspent)
           ) {
             await Ads.updateOne(
