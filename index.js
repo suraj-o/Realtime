@@ -850,19 +850,41 @@ const SaveChats = async (data) => {
 //community msgs
 const savemsg = async (data) => {
   try {
-    const message = new Message({
-      text: data?.text,
-      sender: data?.sender_id,
-      topicId: data?.sendtopicId,
-      typ: data?.typ,
-      mesId: data?.mesId,
-      reply: data?.reply,
-      dissapear: data?.dissapear,
-      comId: data?.comId,
-      sequence: data?.sequence,
-      timestamp: data?.timestamp,
-    });
-    await message.save();
+    let content = {};
+    if (data?.typ === "gif") {
+      content = {
+        uri: data?.url,
+      };
+      const message = new Message({
+        text: data?.text,
+        sender: data?.sender_id,
+        topicId: data?.sendtopicId,
+        typ: data?.typ,
+        mesId: data?.mesId,
+        reply: data?.reply,
+        dissapear: data?.dissapear,
+        comId: data?.comId,
+        sequence: data?.sequence,
+        timestamp: data?.timestamp,
+        content,
+      });
+      await message.save();
+    } else {
+      const message = new Message({
+        text: data?.text,
+        sender: data?.sender_id,
+        topicId: data?.sendtopicId,
+        typ: data?.typ,
+        mesId: data?.mesId,
+        reply: data?.reply,
+        dissapear: data?.dissapear,
+        comId: data?.comId,
+        sequence: data?.sequence,
+        timestamp: data?.timestamp,
+      });
+      await message.save();
+    }
+
     console.log("saved");
   } catch (e) {
     console.log(e, "notsaved");
