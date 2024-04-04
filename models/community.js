@@ -122,6 +122,11 @@ const communitySchema = new mongoose.Schema(
     newmembers: [{ type: ObjectId, ref: "User" }],
     paidmemberscount: { type: Number, default: 0 },
     ismonetized: { type: Boolean, default: false },
+    reportstatus: {
+      type: String,
+      enum: ["unblock", "block"],
+      default: "unblock",
+    },
   },
   { timestamps: false, strict: false }
 );
