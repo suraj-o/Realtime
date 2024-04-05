@@ -916,7 +916,7 @@ const sendNoti = async (data) => {
           notification: {
             title: data?.sender_fullname,
             body:
-              data?.typ === "image"
+              data?.type === "image"
                 ? "Image"
                 : data?.typ === "video"
                 ? "Video"
@@ -924,6 +924,12 @@ const sendNoti = async (data) => {
                 ? "Document"
                 : data?.typ === "glimpse"
                 ? "Glimpse"
+                : data?.typ === "gif"
+                ? "GIF"
+                : data?.typ === "product"
+                ? "Product"
+                : data?.typ === "post"
+                ? "Post"
                 : data?.text,
           },
           data: {
@@ -939,6 +945,12 @@ const sendNoti = async (data) => {
                 ? "Document"
                 : data?.typ === "glimpse"
                 ? "Glimpse"
+                : data?.typ === "gif"
+                ? "GIF"
+                : data?.typ === "product"
+                ? "Product"
+                : data?.typ === "post"
+                ? "Post"
                 : `${data?.text}`,
             convId: `${data?.convId}`,
             createdAt: `${data?.timestamp}`,
