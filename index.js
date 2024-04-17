@@ -571,9 +571,9 @@ io.on("connection", (socket) => {
             const com = await Community.findById(post.community);
             if (com) {
               if (com.ismonetized === true && inside) {
-                //giving 90% to creator
-                let moneytocreator = (adRate / 100) * 90;
-                let moneytocompany = (adRate / 100) * 10;
+                //giving 80% to creator
+                let moneytocreator = (adRate / 100) * 80;
+                let moneytocompany = (adRate / 100) * 20;
 
                 let earned = { how: "Ads", when: Date.now() };
                 await User.updateOne(
