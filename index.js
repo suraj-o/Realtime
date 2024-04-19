@@ -437,6 +437,7 @@ io.on("connection", (socket) => {
       const post = await Post.findById(postId);
       if (post) {
         await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
+        console.log("post View");
       } else {
         console.log("error inc views");
       }
@@ -462,14 +463,16 @@ io.on("connection", (socket) => {
           date: formattedDate,
           id: post.promoid,
         });
-
+        console.log(post.promoid);
         const ad = await Ads.findById(post.promoid);
         const user = await User.findById(userId);
         const advertiser = await Advertiser.findById(ad.advertiserid);
 
         if (
           ad &&
-          new Date(ad?.enddate) >= new Date() &&
+          (ad?.enddate === "Not Selected"
+            ? true
+            : new Date(ad?.enddate) >= new Date()) &&
           ad.status !== "stopped" &&
           advertiser
         ) {
