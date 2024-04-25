@@ -436,7 +436,7 @@ io.on("connection", (socket) => {
     try {
       const post = await Post.findById(postId);
       if (post) {
-        await Post.updateOne({ _id: post._id }, { $inc: { views: 1 } });
+        await Post.updateOne({ _id: post._id }, { $inc: { views: 3 } });
         console.log("post View");
       } else {
         console.log("error inc views");
