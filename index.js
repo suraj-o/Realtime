@@ -586,6 +586,18 @@ io.on("connection", (socket) => {
                     $push: { earningtype: earned },
                   }
                 );
+                const getrandom = Math.round(Math.random());
+                if (getrandom === 0) {
+                  await Community.updateOne(
+                    { _id: com._id },
+                    { $inc: { cpm: moneytocreator } }
+                  );
+                } else {
+                  await Community.updateOne(
+                    { _id: com._id },
+                    { $inc: { cpc: moneytocreator } }
+                  );
+                }
 
                 let earning = {
                   how: "Ads",
