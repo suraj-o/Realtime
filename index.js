@@ -361,6 +361,25 @@ io.on("connection", (socket) => {
       sendNotifcation(data);
     }
   });
+
+  socket.on("chatMessagecontent", async ({ roomId, userId, data }) => {
+    const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
+    if (usercheck) {
+      console.log("sent", roomId);
+      socket.join(roomId);
+      socket.to(roomId).emit("ms", data);
+
+      sendNotifcation(data);
+    } else {
+      console.log("joined and sent");
+      socket.join(roomId);
+      addUserToRoom(roomId, userId, socket.id);
+      socket.to(roomId).emit("ms", data);
+
+      sendNotifcation(data);
+    }
+  });
+
   socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
     const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
     const rec = await User.findById(data?.reciever);
