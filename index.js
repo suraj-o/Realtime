@@ -861,7 +861,8 @@ const SaveChats = async (data) => {
       reply: data?.reply,
       dissapear: data?.dissapear,
       isread: data?.isread,
-      sequence: data?.sequence,
+      sequence:
+        (await Message.countDocuments({ conversationId: data?.convId })) + 1,
       timestamp: data?.timestamp,
       replyId: data?.replyId,
     });
@@ -898,7 +899,7 @@ const savemsg = async (data) => {
         reply: data?.reply,
         dissapear: data?.dissapear,
         comId: data?.comId,
-        sequence: data?.sequence,
+        sequence: (await Message.countDocuments({ comId: data?.comId })) + 1,
         timestamp: data?.timestamp,
         content,
       });
