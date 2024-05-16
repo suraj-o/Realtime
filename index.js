@@ -577,6 +577,19 @@ io.on("connection", (socket) => {
   });
 
   //for instant read msg
+  socket.on("readnowupper", async ({ userId, roomId, mesId }) => {
+    let data = { id: userId, mesId };
+    console.log(userId, roomId, mesId, "success read");
+    if (mesId) {
+      await Message.updateOne(
+        { mesId: mesId },
+        { $addToSet: { readby: userId }, $set: { issent: true } }
+      );
+    }
+    console.log("read", data?.id);
+  });
+
+  //for reading normally
   socket.on("readnow", async ({ userId, roomId, mesId }) => {
     let data = { id: userId, mesId };
     socket.to(roomId).emit("readconvs", data);
