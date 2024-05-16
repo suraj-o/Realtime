@@ -258,42 +258,9 @@ io.use(async (socket, next) => {
       const user = await User.findById(sessionID);
 
       if (user.notificationtoken) {
-        const allmsgs = await Message.find({
-          issent: false,
-          rec: sessionID,
-          readby: { $nin: [sessionID] },
-        })
-          .populate("sender", "profilepic fullname")
-          .populate("rec", "profilepic")
-          .sort({ createdAt: -1 })
-          .limit(5);
-
-        if (allmsgs?.length > 0) {
-          //sending missing messages
-          for (let i = 0; i < allmsgs.length; i++) {
-            let data = {
-              sender_fullname: allmsgs[i].sender.fullname,
-              sender_id: allmsgs[i].sender._id,
-              text: allmsgs[i].text,
-              createdAt: allmsgs[i].createdAt,
-              timestamp: allmsgs[i].timestamp,
-              mesId: allmsgs[i].mesId,
-              typ: allmsgs[i].typ,
-              convId: allmsgs[i].conversationId,
-              reciever: allmsgs[i].rec._id,
-              reciever_pic: allmsgs[i].rec.profilepic,
-              isread: allmsgs[i].isread,
-              sender: { _id: allmsgs[i].sender },
-              readby: allmsgs[i].readby,
-            };
-
-            sendNoti(data);
-            await Message.updateOne(
-              { _id: allmsgs[i]._id },
-              { $set: { issent: true } }
-            );
-          }
-        }
+        //awake notification
+        let data = { id: user._id, notificationtoken: user.notificationtoken };
+        sendNotiouter(data);
       }
     }
     // sessionStore(sessionID);
@@ -308,6 +275,72 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     addUser({ userId, socketId: socket.id });
     addUserToRoom(roomId, userId, socket.id);
+  });
+
+  socket.on("check-late", async (data) => {
+    const finalid = data;
+    const allmsgs = await Message.find({
+      issent: false,
+      rec: data,
+      readby: { $nin: [data] },
+    })
+      .populate("sender", "profilepic fullname username isverified")
+      .populate("rec", "profilepic fullname username isverified")
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    if (allmsgs?.length > 0) {
+      //sending missing messages
+      for (let i = 0; i < allmsgs.length; i++) {
+        let data = {
+          sender_fullname: allmsgs[i].sender.fullname,
+          sender_id: allmsgs[i].sender._id,
+          text: allmsgs[i].text,
+          createdAt: allmsgs[i].createdAt,
+          timestamp: allmsgs[i].timestamp,
+          mesId: allmsgs[i].mesId,
+          typ: allmsgs[i].typ,
+          convId: allmsgs[i].conversationId,
+          isread: allmsgs[i].isread,
+          sender: { _id: allmsgs[i].sender },
+          readby: allmsgs[i].readby,
+          //reciever: allmsgs[i].rec._id,
+          //reciever_pic: allmsgs[i].rec.profilepic,
+        };
+        let ext = {
+          convid: allmsgs[i].conversationId,
+          fullname: allmsgs[i].sender.fullname,
+          id: allmsgs[i].sender._id,
+          isverified: allmsgs[i].sender.isverified,
+          msgs: [
+            {
+              sender: allmsgs[i].sender._id,
+              conversationId: allmsgs[i].conversationId,
+
+              isread: allmsgs[i].isread,
+
+              text: allmsgs[i].text,
+              createdAt: allmsgs[i].createdAt,
+              timestamp: allmsgs[i].timestamp,
+              mesId: allmsgs[i].mesId,
+              typ: allmsgs[i].typ,
+            },
+          ],
+          pic: process.env.URL + allmsgs[i].sender.profilepic,
+          username: allmsgs[i].sender.username,
+          readby: allmsgs[i].readby,
+        };
+
+        let final = { data, ext };
+
+        io.to(finalid).emit("outer-private", final);
+
+        await Message.updateOne(
+          { _id: allmsgs[i]._id },
+          { $set: { issent: true } }
+        );
+      }
+    }
   });
 
   //for marking active users
@@ -1045,6 +1078,7 @@ const sendNoti = async (data) => {
                 : data?.text,
           },
           data: {
+            late: "false",
             screen: "Conversation",
             sender_fullname: `${data?.sender_fullname}`,
             sender_id: `${data?.sender_id}`,
@@ -1090,6 +1124,32 @@ const sendNoti = async (data) => {
           });
       }
     }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const sendNotiouter = async (data) => {
+  try {
+    const message = {
+      notification: {},
+      data: {
+        late: "true",
+        screen: "Conversation",
+        id: `${data.id}`,
+      },
+      token: data?.notificationtoken,
+    };
+
+    await admin
+      .messaging()
+      .send(message)
+      .then((response) => {
+        console.log("Successfully sent message");
+      })
+      .catch((error) => {
+        console.log("Error sending message:", error);
+      });
   } catch (e) {
     console.log(e);
   }
