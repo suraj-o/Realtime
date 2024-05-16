@@ -247,6 +247,61 @@ const isUserthere = ({ userId }) => {
   return users.some((user) => user.userId === userId);
 };
 
+//middleware
+io.use(async (socket, next) => {
+  const sessionID = socket.handshake.auth.id;
+  const type = socket.handshake.auth.type;
+
+  if (sessionID) {
+    socket.join(sessionID);
+    if (type === "mobile") {
+      const user = await User.findById(sessionID);
+
+      if (user.notificationtoken) {
+        const allmsgs = await Message.find({
+          issent: false,
+          rec: sessionID,
+          readby: { $nin: [sessionID] },
+        })
+          .populate("sender", "profilepic fullname")
+          .populate("rec", "profilepic")
+          .sort({ createdAt: -1 })
+          .limit(5);
+
+        if (allmsgs?.length > 0) {
+          //sending missing messages
+          for (let i = 0; i < allmsgs.length; i++) {
+            let data = {
+              sender_fullname: allmsgs[i].sender.fullname,
+              sender_id: allmsgs[i].sender._id,
+              text: allmsgs[i].text,
+              createdAt: allmsgs[i].createdAt,
+              timestamp: allmsgs[i].timestamp,
+              mesId: allmsgs[i].mesId,
+              typ: allmsgs[i].typ,
+              convId: allmsgs[i].conversationId,
+              reciever: allmsgs[i].rec._id,
+              reciever_pic: allmsgs[i].rec.profilepic,
+              isread: allmsgs[i].isread,
+              sender: { _id: allmsgs[i].sender },
+              readby: allmsgs[i].readby,
+            };
+
+            sendNoti(data);
+            await Message.updateOne(
+              { _id: allmsgs[i]._id },
+              { $set: { issent: true } }
+            );
+          }
+        }
+      }
+    }
+    // sessionStore(sessionID);
+    console.log("middleware ran for", sessionID, "in", type);
+    return next();
+  }
+});
+
 io.on("connection", (socket) => {
   socket.on("joinUser", ({ userId, roomId }) => {
     console.log("user joined", userId, socket.id);
@@ -380,8 +435,45 @@ io.on("connection", (socket) => {
     }
   });
 
+  // socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
+  //   const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
+  //   const rec = await User.findById(data?.reciever);
+  //   const sender = await User.findById(data?.sender_id);
+
+  //   let isblocked = false;
+  //   rec.blockedpeople.forEach((p) => {
+  //     if (p?.id?.toString() === sender._id.toString()) {
+  //       isblocked = true;
+  //     }
+  //   });
+  //   sender.blockedpeople.forEach((p) => {
+  //     if (p?.id?.toString() === rec._id.toString()) {
+  //       isblocked = true;
+  //     }
+  //   });
+  //   SaveChats(data);
+  //   if (isblocked === false) {
+  //     if (usercheck) {
+  //       console.log("sent to", userId);
+  //       socket.join(roomId);
+  //       socket.to(roomId).emit("ms", data);
+  //       socket.to(userId).emit("allchats", ext);
+
+  //       sendNoti(data);
+  //     } else {
+  //       console.log("joined and sent");
+  //       socket.join(roomId);
+  //       addUserToRoom(roomId, userId, socket.id);
+  //       socket.to(roomId).emit("ms", data);
+  //       socket.to(userId).emit("allchats", ext);
+
+  //       sendNoti(data);
+  //     }
+  //   }
+  // });
+
+  //for private messages
   socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
-    const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
     const rec = await User.findById(data?.reciever);
     const sender = await User.findById(data?.sender_id);
 
@@ -398,22 +490,13 @@ io.on("connection", (socket) => {
     });
     SaveChats(data);
     if (isblocked === false) {
-      if (usercheck) {
-        console.log("sent to", userId);
-        socket.join(roomId);
-        socket.to(roomId).emit("ms", data);
-        socket.to(userId).emit("allchats", ext);
+      socket.to(roomId).to(userId).emit("reads", data);
+      // socket.to(userId).emit("allchats", ext);
+      let final = { data, ext };
 
-        sendNoti(data);
-      } else {
-        console.log("joined and sent");
-        socket.join(roomId);
-        addUserToRoom(roomId, userId, socket.id);
-        socket.to(roomId).emit("ms", data);
-        socket.to(userId).emit("allchats", ext);
-
-        sendNoti(data);
-      }
+      socket.to(roomId).to(userId).emit("outer-private", final);
+      console.log(data, roomId, userId);
+      sendNoti(data);
     }
   });
 
@@ -445,7 +528,7 @@ io.on("connection", (socket) => {
     if (mesId) {
       await Message.updateOne(
         { mesId: mesId },
-        { $addToSet: { readby: userId } }
+        { $addToSet: { readby: userId }, $set: { issent: true } }
       );
     }
   });
@@ -865,6 +948,7 @@ const SaveChats = async (data) => {
         (await Message.countDocuments({ conversationId: data?.convId })) + 1,
       timestamp: data?.timestamp,
       replyId: data?.replyId,
+      rec: data?.reciever,
     });
     await message.save();
     console.log("Saved");
@@ -972,7 +1056,7 @@ const sendNoti = async (data) => {
             sender_fullname: `${data?.sender_fullname}`,
             sender_id: `${data?.sender_id}`,
             text:
-              data?.type === "image"
+              data?.typ === "image"
                 ? "Image"
                 : data?.typ === "video"
                 ? "Video"

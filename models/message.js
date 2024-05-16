@@ -55,6 +55,11 @@ const messageSchema = new mongoose.Schema(
     timestamp: { type: String },
     isread: { type: Boolean, default: false },
     readby: [{ type: ObjectId, ref: "User" }],
+    issent: { type: Boolean, default: false },
+    rec: {
+      type: ObjectId,
+      ref: "User",
+    },
   },
   { timestamps: true }
 );
