@@ -495,7 +495,35 @@ io.on("connection", (socket) => {
       let final = { data, ext };
 
       socket.to(roomId).to(userId).emit("outer-private", final);
-      console.log(data, roomId, userId);
+      console.log(data, roomId, userId, "message");
+      sendNoti(data);
+    }
+  });
+
+  socket.on("singleChatContent", async ({ roomId, userId, data, ext }) => {
+    //const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
+
+    const rec = await User.findById(data?.reciever);
+    const sender = await User.findById(data?.sender_id);
+
+    let isblocked = false;
+    rec.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === sender._id.toString()) {
+        isblocked = true;
+      }
+    });
+    sender.blockedpeople.forEach((p) => {
+      if (p?.id?.toString() === rec._id.toString()) {
+        isblocked = true;
+      }
+    });
+    if (isblocked === false) {
+      socket.to(roomId).to(userId).emit("reads", data);
+
+      let final = { data, ext };
+
+      socket.to(roomId).to(userId).emit("outer-private", final);
+      console.log(data, roomId, userId, "Media");
       sendNoti(data);
     }
   });
@@ -766,41 +794,6 @@ io.on("connection", (socket) => {
       }
     } catch (e) {
       console.log(e);
-    }
-  });
-
-  socket.on("singleChatContent", async ({ roomId, userId, data, ext }) => {
-    const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
-
-    const rec = await User.findById(data?.reciever);
-    const sender = await User.findById(data?.sender_id);
-
-    let isblocked = false;
-    rec.blockedpeople.forEach((p) => {
-      if (p?.id?.toString() === sender._id.toString()) {
-        isblocked = true;
-      }
-    });
-    sender.blockedpeople.forEach((p) => {
-      if (p?.id?.toString() === rec._id.toString()) {
-        isblocked = true;
-      }
-    });
-    if (isblocked === false) {
-      if (usercheck) {
-        console.log("sent", roomId);
-        socket.join(roomId);
-        socket.to(roomId).emit("ms", data);
-        socket.to(userId).emit("allchats", ext);
-        sendNoti(data);
-      } else {
-        console.log("joined and sent");
-        socket.join(roomId);
-        addUserToRoom(roomId, userId, socket.id);
-        socket.to(roomId).emit("ms", data);
-        socket.to(userId).emit("allchats", ext);
-        sendNoti(data);
-      }
     }
   });
 
