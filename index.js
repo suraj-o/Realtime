@@ -583,7 +583,7 @@ io.on("connection", (socket) => {
     if (mesId) {
       await Message.updateOne(
         { mesId: mesId },
-        { $addToSet: { readby: userId }, $set: { issent: true } }
+        { $addToSet: { readby: [userId, roomId] }, $set: { issent: true } }
       );
     }
     console.log("read", data?.id);
