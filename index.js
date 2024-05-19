@@ -260,7 +260,7 @@ io.use(async (socket, next) => {
       if (user.notificationtoken) {
         //awake notification
         let data = { id: user._id, notificationtoken: user.notificationtoken };
-        sendNotiouter(data);
+        //  sendNotiouter(data);
       }
     }
     // sessionStore(sessionID);
