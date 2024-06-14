@@ -571,12 +571,14 @@ io.on("connection", (socket) => {
     socket.join(userId); //person who is typing
     socket.to(roomId).emit("istyping", data);
     socket.to(id).emit("istypingext", data);
+    socket.to(roomId).to(id).emit("outer-private-typing", data);
   });
   //deleting for everyone conversations
   socket.on("deleteforeveryone", async ({ roomId, userId, data }) => {
     socket.join(roomId);
     socket.to(roomId).emit("deleted", data);
     socket.to(userId).emit("deletedext", data);
+    socket.to(roomId).to(userId).emit("outer-private-delete", data);
   });
 
   //for instant read msg
