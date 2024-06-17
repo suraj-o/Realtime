@@ -441,6 +441,7 @@ io.on("connection", (socket) => {
       console.log("sent", roomId);
       socket.join(roomId);
       socket.to(roomId).emit("ms", data);
+      socket.to(roomId).to(userId).emit("outer-ms", data);
       savemsg(data);
       sendNotifcation(data);
     } else {
@@ -448,6 +449,7 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       addUserToRoom(roomId, userId, socket.id);
       socket.to(roomId).emit("ms", data);
+      socket.to(roomId).to(userId).emit("outer-ms", data);
       savemsg(data);
       sendNotifcation(data);
     }
@@ -459,12 +461,13 @@ io.on("connection", (socket) => {
       console.log("sent", roomId);
       socket.join(roomId);
       socket.to(roomId).emit("ms", data);
-
+      socket.to(roomId).to(userId).emit("outer-ms", data);
       sendNotifcation(data);
     } else {
       console.log("joined and sent");
       socket.join(roomId);
       addUserToRoom(roomId, userId, socket.id);
+      socket.to(roomId).to(userId).emit("outer-ms", data);
       socket.to(roomId).emit("ms", data);
 
       sendNotifcation(data);
@@ -861,17 +864,66 @@ io.on("connection", (socket) => {
 
   //video calling
   socket.on("room:join", (data) => {
-    const { email, room } = data;
-    emailToSocketIdMap.set(email, socket.id);
-    socketidToEmailMap.set(socket.id, email);
-    io.to(room).emit("user:joined", { email, id: socket.id });
+    const { room } = data;
+    io.to(room).emit("user:joined", { id: socket.id });
     socket.join(room);
     io.to(socket.id).emit("room:join", data);
   });
 
   //call
+  socket.on("call:start", ({ id, hisid, convId }) => {
+    const sendcall = async ({ id, hisid }) => {
+      try {
+        const user = await User.findById(id);
+        const rec = await User.findById(hisid);
+        if (rec.notificationtoken) {
+          let dp = process.env.URL + user.profilepic;
+
+          const timestamp = `${new Date()}`;
+          const msg = {
+            notification: { title: `${user?.fullname}`, body: "Incoming Call" },
+            data: {
+              screen: "OngoingCall",
+              type: "incoming",
+              name: `${user?.fullname}`,
+              sender_id: `${user._id}`,
+              text: `incoming call from ${user.fullname}`,
+              recid: `${rec._id}`, //rec id
+              callconvId: `${convId}`,
+              timestamp: `${timestamp}`,
+              dp,
+            },
+            token: rec?.notificationtoken,
+          };
+
+          await admin
+            .messaging()
+            .send(msg)
+            .then((response) => {
+              console.log("Successfully sent call Alert");
+              io.to(id).emit("isringing", true);
+            })
+            .catch((error) => {
+              console.log("Error sending message:", error);
+            });
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    sendcall({ id, hisid });
+  });
+
   socket.on("user:call", ({ to, offer }) => {
-    io.to(to).emit("incomming:call", { from: socket.id, offer });
+    console.log("Calling", to);
+    io.to(to).emit("incoming:call", { from: socket.id, offer });
+  });
+
+  socket.on("call:picked", ({ check, id }) => {
+    if (check) {
+      console.log(check, id);
+      io.to(id).emit("call:picked:final", { from: socket.id });
+    }
   });
 
   socket.on("call:accepted", ({ to, ans }) => {
@@ -885,6 +937,15 @@ io.on("connection", (socket) => {
   socket.on("peer:nego:done", ({ to, ans }) => {
     console.log("peer:nego:done", ans);
     io.to(to).emit("peer:nego:final", { from: socket.id, ans });
+  });
+
+  socket.on("call:end", ({ hisid }) => {
+    console.log("ending call with", hisid);
+    io.to(hisid).emit("call:end:final", { end: true });
+  });
+
+  socket.on("decline:call", ({ to }) => {
+    io.to(to).emit("decline:call:final", { end: true });
   });
 
   socket.on("disconnect", () => {
@@ -1266,6 +1327,45 @@ const sendNotifcation = async (data) => {
         });
     } else {
       console.log("no notifications");
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+//sending call
+const sendcall = async ({ id, hisid }) => {
+  try {
+    const user = await User.findById(id);
+    const rec = await User.findById(hisid);
+    if (rec.notificationtoken) {
+      let dp = process.env.URL + user.profilepic;
+
+      const timestamp = `${new Date()}`;
+      const msg = {
+        notification: { title: `${user?.fullname}`, body: "Incoming Call" },
+        data: {
+          screen: "OngoingCall",
+          type: "incoming",
+          name: `${user?.fullname}`,
+          sender_id: `${user._id}`,
+          text: `incoming call from ${user.fullname}`,
+          callconvId: `${rec._id}`, //rec id
+          timestamp: `${timestamp}`,
+          dp,
+        },
+        token: rec?.notificationtoken,
+      };
+
+      await admin
+        .messaging()
+        .send(msg)
+        .then((response) => {
+          console.log("Successfully sent call Alert");
+        })
+        .catch((error) => {
+          console.log("Error sending message:", error);
+        });
     }
   } catch (e) {
     console.log(e);
