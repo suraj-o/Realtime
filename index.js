@@ -18,6 +18,12 @@ const Message = require("./models/message");
 const Analytics = require("./models/Analytics");
 const Advertiser = require("./models/Advertiser");
 const Post = require("./models/post");
+const {
+  RtcTokenBuilder,
+  RtmTokenBuilder,
+  RtcRole,
+  RtmRole,
+} = require("agora-access-token");
 const Minio = require("minio");
 const minioClient = new Minio.Client({
   endPoint: "minio.grovyo.xyz",
@@ -248,6 +254,26 @@ const removeUser = ({ socketId }) => {
 
 const isUserthere = ({ userId }) => {
   return users.some((user) => user.userId === userId);
+};
+
+const generateRtcToken = function ({ convId, id, isHost }) {
+  let appID = process.env.AGORA_APP_ID;
+  let appCertificate = process.env.AGORA_APP_CERTIFICATE;
+  var currentTimestamp = Math.floor(Date.now() / 1000);
+  var privilegeExpiredTs = currentTimestamp + 3600;
+  var channelName = convId;
+  let role = isHost ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
+  console.log("New token Generated for", role);
+  var key = RtcTokenBuilder.buildTokenWithUid(
+    appID,
+    appCertificate,
+    channelName,
+    id,
+    role,
+    privilegeExpiredTs
+  );
+
+  return key;
 };
 
 //middleware
@@ -865,6 +891,7 @@ io.on("connection", (socket) => {
   //video calling
   socket.on("room:join", (data) => {
     const { room } = data;
+    console.log(room);
     io.to(room).emit("user:joined", { id: socket.id });
     socket.join(room);
     io.to(socket.id).emit("room:join", data);
@@ -892,6 +919,7 @@ io.on("connection", (socket) => {
               callconvId: `${convId}`,
               timestamp: `${timestamp}`,
               dp,
+              // offer: JSON.stringify(offer),
             },
             token: rec?.notificationtoken,
           };
@@ -913,6 +941,18 @@ io.on("connection", (socket) => {
     };
     sendcall({ id, hisid });
   });
+
+  socket.on("user:accept", ({ to }) => {
+    io.to(to).emit("user:accept:final", {});
+  });
+  socket.on("send:offer", ({ to, offer }) => {
+    socket.to(to).emit("send:ans", { offer });
+  });
+  socket.on("send:newans", ({ to, ans }) => {
+    socket.to(to).emit("set:ans", { ans });
+  });
+
+  //end
 
   socket.on("user:call", ({ to, offer }) => {
     console.log("Calling", to);
@@ -946,6 +986,13 @@ io.on("connection", (socket) => {
 
   socket.on("decline:call", ({ to }) => {
     io.to(to).emit("decline:call:final", { end: true });
+  });
+
+  //agora
+  socket.on("generate:token", async ({ to, convId, id, isHost }) => {
+    let token = generateRtcToken({ convId, id, isHost });
+
+    io.to(to).emit("gen:final", token);
   });
 
   socket.on("disconnect", () => {
