@@ -627,6 +627,7 @@ io.on("connection", (socket) => {
   socket.on("readnow", async ({ userId, roomId, mesId }) => {
     let data = { id: userId, mesId };
     socket.to(roomId).emit("readconvs", data);
+    socket.to(userId).emit("readconvs", data);
     console.log("read", data?.id);
   });
 
