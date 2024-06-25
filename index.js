@@ -596,17 +596,18 @@ io.on("connection", (socket) => {
   //typing status convsersations
   socket.on("typing", async ({ roomId, id, userId, status }) => {
     let data = { id: userId, status, convId: roomId };
-
-    socket.join(userId); //person who is typing
+    console.log("typed  by " + userId);
     socket.to(roomId).emit("istyping", data);
-    socket.to(id).emit("istypingext", data);
-    socket.to(roomId).to(id).emit("outer-private-typing", data);
+    socket.to(id).to(userId).emit("istypingext", data);
+
+    socket.to(roomId).to(id).to(userId).emit("outer-private-typing", data);
   });
+
   //deleting for everyone conversations
-  socket.on("deleteforeveryone", async ({ roomId, userId, data }) => {
-    socket.join(roomId);
+  socket.on("deleteforeveryone", async ({ roomId, rec, userId, data }) => {
+    console.log("Deleted by" + userId);
     socket.to(roomId).emit("deleted", data);
-    socket.to(userId).emit("deletedext", data);
+    socket.to(userId).to(rec).emit("deletedext", data);
     socket.to(roomId).to(userId).emit("outer-private-delete", data);
   });
 
@@ -626,8 +627,7 @@ io.on("connection", (socket) => {
   //for reading normally
   socket.on("readnow", async ({ userId, roomId, mesId }) => {
     let data = { id: userId, mesId };
-    socket.to(roomId).emit("readconvs", data);
-    socket.to(userId).emit("readconvs", data);
+    io.to(userId).to(roomId).emit("readconvs", data);
     console.log("read", data?.id);
   });
 
@@ -637,7 +637,7 @@ io.on("connection", (socket) => {
     if (mesId) {
       await Message.updateOne(
         { mesId: mesId },
-        { $addToSet: { readby: userId }, $set: { issent: true } }
+        { $addToSet: { readby: userId, roomId }, $set: { issent: true } }
       );
     }
   });
@@ -878,10 +878,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("blockperson", ({ roomId, userId, action }) => {
+  socket.on("blockperson", ({ roomId, rec, userId, action }) => {
     let data = { id: userId, action };
     console.log(roomId, userId, "block");
-    socket.to(roomId).emit("afterblock", data);
+    socket.to(roomId).to(rec).emit("afterblock", data);
   });
 
   socket.on("leaveRoom", ({ roomId, userId }) => {
