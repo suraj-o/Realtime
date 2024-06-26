@@ -642,6 +642,21 @@ io.on("connection", (socket) => {
     }
   });
 
+  //for braodcasting poll happened
+  socket.on("polled", async ({ id, postId, optionId, comId }) => {
+    try {
+      const post = await Post.findById(postId);
+      const user = await User.findById(id);
+      const community = await Community.findById(comId);
+      if (post && user && community) {
+        //sending notification to whole community
+        sendNotifcationCommunity({ id, postId, optionId, comId });
+      }
+    } catch (e) {
+      console.log(e, "poll unsucessfull");
+    }
+  });
+
   //recording views
   socket.on("emitviews", async ({ postId }) => {
     try {
@@ -1375,6 +1390,76 @@ const sendNotifcation = async (data) => {
         });
     } else {
       console.log("no notifications");
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const sendNotifcationCommunity = async ({ id, postId, optionId, comId }) => {
+  try {
+    const coms = await Community.findById(comId).populate({
+      path: "notifications.id",
+      model: "User",
+      select: "notificationtoken",
+    });
+    const post = await Post.findById(postId);
+    const user = await User.findById(id);
+    if (coms && post && user) {
+      const subscribedTokens = coms?.notifications?.map((t) =>
+        t?.muted === true ? null : t.id.notificationtoken
+      );
+      let tokens = [];
+
+      if (Array.isArray(subscribedTokens) && subscribedTokens.length > 0) {
+        for (const token of subscribedTokens) {
+          try {
+            if (token !== null) {
+              tokens.push(token);
+            }
+          } catch (error) {
+            console.log(
+              `Error sending notification to token ${token}:`,
+              error.message
+            );
+          }
+        }
+      } else {
+        console.warn("No valid tokens to send notifications.");
+      }
+
+      if (tokens?.length > 0) {
+        const message = {
+          notification: {
+            title: coms.title,
+            body: `${user.fullname} voted in ${post.title}`,
+          },
+          data: {
+            screen: "CommunityChat",
+            sender_fullname: `${user.fullname}`,
+            sender_id: `${user._id}`,
+            text: `A New Vote is Here!`,
+            createdAt: `${Date.now()}`,
+
+            comId: `${coms._id}`,
+
+            postId: `${postId}`,
+          },
+          tokens: tokens,
+        };
+
+        await admin
+          .messaging()
+          .sendEachForMulticast(message)
+          .then((response) => {
+            console.log("Successfully sent message");
+          })
+          .catch((error) => {
+            console.log("Error sending message:", error);
+          });
+      } else {
+        console.log("no notifications");
+      }
     }
   } catch (e) {
     console.log(e);
