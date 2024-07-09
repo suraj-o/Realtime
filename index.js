@@ -18,6 +18,7 @@ const Message = require("./models/message");
 const Analytics = require("./models/Analytics");
 const Advertiser = require("./models/Advertiser");
 const Post = require("./models/post");
+const Deluser = require("./models/deluser");
 const {
   RtcTokenBuilder,
   RtmTokenBuilder,
@@ -286,7 +287,7 @@ io.use(async (socket, next) => {
     if (type === "mobile") {
       const user = await User.findById(sessionID);
 
-      if (user.notificationtoken) {
+      if (user && user.notificationtoken) {
         //awake notification
         let data = { id: user._id, notificationtoken: user.notificationtoken };
         //  sendNotiouter(data);
@@ -1009,6 +1010,16 @@ io.on("connection", (socket) => {
     let token = generateRtcToken({ convId, id, isHost });
 
     io.to(to).emit("gen:final", token);
+  });
+
+  socket.on("currentloc", async (data) => {
+    const { id, lat, long } = data;
+    const user = await Deluser.findById(id);
+    if (user) {
+      user.currentlocation.latitude = lat;
+      user.currentlocation.longitude = long;
+      await user.save();
+    }
   });
 
   socket.on("disconnect", () => {
