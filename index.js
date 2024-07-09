@@ -1015,7 +1015,7 @@ io.on("connection", (socket) => {
   socket.on("currentloc", async (data) => {
     const { id, lat, long } = data;
     const user = await Deluser.findById(id);
-    if (user) {
+    if (user && lat && long) {
       user.currentlocation.latitude = lat;
       user.currentlocation.longitude = long;
       await user.save();
