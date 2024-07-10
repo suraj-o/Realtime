@@ -1001,49 +1001,32 @@ io.on("connection", (socket) => {
       await user.save();
     }
   });
-
   let fileStream;
-
   socket.on("upload-start", async (message) => {
     const data = JSON.parse(message);
     const { chunk, fileName, offset, totalSize } = data;
 
-    try {
-      if (offset === 0) {
-        // Create a writable stream for the new file
-        const filePath = path.join(__dirname, "uploads", fileName);
-        fileStream = fs.createWriteStream(filePath);
-
-        // Event listeners for error and close events on fileStream
-        fileStream.on("error", (err) => {
-          console.error("File stream error:", err);
-          // Handle error as needed
-        });
-
-        fileStream.on("close", () => {
-          console.log("File stream closed");
-        });
-      }
-
-      // Write the chunk to the file
-      const buffer = Buffer.from(chunk, "base64");
-      fileStream.write(buffer, () => {
-        const progress = Math.round(
-          ((offset + buffer.length) / totalSize) * 100
-        );
-        console.log(`Progress: ${progress}%`);
-
-        // If last chunk, close the fileStream
-        if (offset + buffer.length >= totalSize) {
-          fileStream.end();
-          console.log("Upload complete");
-        }
-      });
-    } catch (error) {
-      console.error("Error during chunk upload:", error);
-      // Handle error appropriately
+    if (offset === 0) {
+      // Create a writable stream for the new file
+      fileStream = fs.createWriteStream(
+        path.join(__dirname, "uploads", fileName)
+      );
     }
+
+    // Write the chunk to the file
+    const buffer = Buffer.from(chunk, "base64");
+    fileStream.write(buffer, () => {
+      const progress = Math.round(((offset + buffer.length) / totalSize) * 100);
+      // ws.send(JSON.stringify({ progress }));
+      console.log(progress);
+      if (offset + buffer.length >= totalSize) {
+        fileStream.end();
+        // ws.send(JSON.stringify({ progress: 100, message: "Upload complete" }));
+        console.log("Complete");
+      }
+    });
   });
+
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
     updateUserLeaveTime({ socketId: socket.id });
