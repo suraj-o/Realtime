@@ -19,38 +19,18 @@ const Analytics = require("./models/Analytics");
 const Advertiser = require("./models/Advertiser");
 const Post = require("./models/post");
 const Deluser = require("./models/deluser");
+const fs = require("fs");
+const path = require("path");
 const {
   RtcTokenBuilder,
   RtmTokenBuilder,
   RtcRole,
   RtmRole,
 } = require("agora-access-token");
-const Minio = require("minio");
-const minioClient = new Minio.Client({
-  endPoint: "minio.grovyo.xyz",
-
-  useSSL: true,
-  accessKey: "shreyansh379",
-  secretKey: "shreyansh379",
-});
-
-//function to ge nerate a presignedurl of minio
-async function generatePresignedUrl(bucketName, objectName, expiry = 604800) {
-  try {
-    const presignedUrl = await minioClient.presignedGetObject(
-      bucketName,
-      objectName,
-      expiry
-    );
-    return presignedUrl;
-  } catch (err) {
-    console.error(err);
-    throw new Error("Failed to generate presigned URL");
-  }
-}
 
 require("dotenv").config();
 
+app.use(require("express-status-monitor")());
 app.use(cors());
 app.use(morgan("dev"));
 app.use(bodyParser.json());
@@ -281,7 +261,7 @@ const generateRtcToken = function ({ convId, id, isHost }) {
 io.use(async (socket, next) => {
   const sessionID = socket.handshake.auth.id;
   const type = socket.handshake.auth.type;
-
+  console.log(sessionID);
   if (sessionID) {
     socket.join(sessionID);
     if (type === "mobile") {
@@ -1022,6 +1002,48 @@ io.on("connection", (socket) => {
     }
   });
 
+  let fileStream;
+
+  socket.on("upload-start", async (message) => {
+    const data = JSON.parse(message);
+    const { chunk, fileName, offset, totalSize } = data;
+
+    try {
+      if (offset === 0) {
+        // Create a writable stream for the new file
+        const filePath = path.join(__dirname, "uploads", fileName);
+        fileStream = fs.createWriteStream(filePath);
+
+        // Event listeners for error and close events on fileStream
+        fileStream.on("error", (err) => {
+          console.error("File stream error:", err);
+          // Handle error as needed
+        });
+
+        fileStream.on("close", () => {
+          console.log("File stream closed");
+        });
+      }
+
+      // Write the chunk to the file
+      const buffer = Buffer.from(chunk, "base64");
+      fileStream.write(buffer, () => {
+        const progress = Math.round(
+          ((offset + buffer.length) / totalSize) * 100
+        );
+        console.log(`Progress: ${progress}%`);
+
+        // If last chunk, close the fileStream
+        if (offset + buffer.length >= totalSize) {
+          fileStream.end();
+          console.log("Upload complete");
+        }
+      });
+    } catch (error) {
+      console.error("Error during chunk upload:", error);
+      // Handle error appropriately
+    }
+  });
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
     updateUserLeaveTime({ socketId: socket.id });
