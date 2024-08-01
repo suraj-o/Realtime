@@ -996,11 +996,32 @@ io.on("connection", (socket) => {
     const { id, lat, long } = data;
     const user = await Deluser.findById(id);
     if (user && lat && long) {
+      console.log(`Got loc for ${id} -  ${(lat, long)}`);
       user.currentlocation.latitude = lat;
       user.currentlocation.longitude = long;
       await user.save();
     }
   });
+
+  //start delivery
+  socket.on("loc-data", async (data) => {
+    const { id, start, end } = data;
+
+    console.log(`starting and ending Coords ${id} - ${start} ${end}`);
+  });
+  //track delivery
+  socket.on("mycoords", async (data) => {
+    const { id, lat, long } = data;
+
+    if (lat && long) {
+      console.log(`Current Coords ${id} - ${lat} ${long}`);
+    }
+  });
+
+  socket.on("locstart", async (data) => {
+    console.log(data);
+  });
+
   let fileStream;
   socket.on("upload-start", async (message) => {
     const data = JSON.parse(message);
