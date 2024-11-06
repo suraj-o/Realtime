@@ -29,14 +29,18 @@ jobs:
     - name: Verify Pushed Image
       run: docker pull grovyo/realtime:latest #
 
-    - name: Run ECS Server
+    - name: Run EC2 Server
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          sudo docker pull 
-          sudo docker stop web-app || true
-          sudo docker rm web-app || true
-          sudo docker run -d --name web-app -p 4400:4400 
+          sudo docker pull grovyo/realtime:latest
+          sudo docker stop realtime || true
+          sudo docker rm relatime || true
+          sudo docker run -d -e DATABASE=${{ secrets:DATABASE_URL }} \
+          -e PORT=${{ secrets:PORT }} -e URL=${{ secrets:URL }} \
+          -e AGORA_APP_ID=${{ secrets:AGORA_APP_ID }} \
+          -e AGORA_APP_CERTIFICATE=${{ secrets:AGORA_APP_CERTIFICATE }} \
+          --name realtime -p 4400:4400 grovyo/realtime:latest
