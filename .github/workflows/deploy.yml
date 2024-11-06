@@ -1,4 +1,4 @@
-name: Deployment For ECS Cloud
+name: Deployment For EC2 Cloud
 
 on:
   push:
