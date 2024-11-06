@@ -9,5 +9,6 @@ COPY models models
 COPY index.js index.js
 
 RUN npm install
+EXPOSE 4400
 
 ENTRYPOINT [ "npm","start" ]
