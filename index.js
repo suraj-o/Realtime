@@ -1499,7 +1499,7 @@ const sendNotifcationCommunity = async ({ id, postId, optionId, comId }) => {
       }
     }
   } catch (e) {
-    console.log(e);
+    console.log("error=>",e);
   }
 };
 
