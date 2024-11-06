@@ -1,4 +1,4 @@
-name: Deployment For ECS Cloud
+name: Deployment For EC2 Cloud
 
 on:
   push:
@@ -7,40 +7,40 @@ on:
 
 jobs:
   Push-And-Run:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Check Out Branches
-      uses: actions/checkout@v3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Branches
+        uses: actions/checkout@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and Push Docker image
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        file: dockerfile
-        push: true
-        tags: grovyo/realtime:latest
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: dockerfile
+          push: true
+          tags: grovyo/realtime:latest
 
-    - name: Verify Pushed Image
-      run: docker pull grovyo/realtime:latest #
+      - name: Verify Pushed Image
+        run: docker pull grovyo/realtime:latest #
 
-    - name: Run EC2 Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          sudo docker pull grovyo/realtime:latest
-          sudo docker stop realtime || true
-          sudo docker rm relatime || true
-          sudo docker run -d -e DATABASE=${{ secrets:DATABASE_URL }} \
-          -e PORT=${{ secrets:PORT }} -e URL=${{ secrets:URL }} \
-          -e AGORA_APP_ID=${{ secrets:AGORA_APP_ID }} \
-          -e AGORA_APP_CERTIFICATE=${{ secrets:AGORA_APP_CERTIFICATE }} \
-          --name realtime -p 4400:4400 grovyo/realtime:latest
+      - name: Run EC2 Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo docker pull grovyo/realtime:latest
+            sudo docker stop realtime || true
+            sudo docker rm relatime || true
+            sudo docker run -d -e DATABASE=${{ secrets:DATABASE_URL }} \
+            -e PORT=${{ secrets:PORT }} -e URL=${{ secrets:URL }} \
+            -e AGORA_APP_ID=${{ secrets:AGORA_APP_ID }} \
+            -e AGORA_APP_CERTIFICATE=${{ secrets:AGORA_APP_CERTIFICATE }} \
+            --name realtime -p 4400:4400 grovyo/realtime:latest
