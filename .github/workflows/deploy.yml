@@ -1,4 +1,4 @@
-name: Deployment For EC2 Cloud
+name: Build and Deploy to Docker Hub
 
 on:
   push:
@@ -6,11 +6,12 @@ on:
       - main
 
 jobs:
-  Push-And-Run:
+  build-and-push:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check Out Branches
-        uses: actions/checkout@v3
+      - name: Check Out Repo
+        uses: actions/checkout@v2
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v1
@@ -24,23 +25,25 @@ jobs:
           context: .
           file: dockerfile
           push: true
-          tags: grovyo/realtime:latest
+          tags: suraj266/realtime:latest
 
       - name: Verify Pushed Image
-        run: docker pull grovyo/realtime:latest #
+        run: docker pull suraj266/realtime:latest  
 
-      - name: Run EC2 Server
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            sudo docker pull grovyo/realtime:latest
+            sudo docker pull suraj266/realtime:latest
             sudo docker stop realtime || true
-            sudo docker rm relatime || true
-            sudo docker run -d -e DATABASE=${{ secrets:DATABASE_URL }} \
-            -e PORT=${{ secrets:PORT }} -e URL=${{ secrets:URL }} \
-            -e AGORA_APP_ID=${{ secrets:AGORA_APP_ID }} \
-            -e AGORA_APP_CERTIFICATE=${{ secrets:AGORA_APP_CERTIFICATE }} \
-            --name realtime -p 4400:4400 grovyo/realtime:latest
+            sudo docker rm realtime || true
+            sudo docker run -d --name realtime -p ${{ secrets.PORT }}:${{ secrets.PORT }} \
+              --env DATABASE="${{ secrets.DATABASE_URL }}" \
+              --env PORT="${{ secrets.PORT }}" \
+              --env URL="${{ secrets.URL }}" \
+              --env AGORA_APP_ID="${{ secrets.AGORA_APP_ID }}" \
+              --env AGORA_APP_CERTIFICATE="${{ secrets.AGORA_APP_CERTIFICATE }}" \
+              suraj266/realtime:latest
