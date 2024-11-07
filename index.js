@@ -57,6 +57,14 @@ admin.initializeApp({
 // roomManager
 let rooms = [];
 
+
+app.get("/",(req,res)=>{
+  res.status(200).json({
+    succes:true,
+    messages:"all is good and healthy"
+  })
+})
+
 const emailToSocketIdMap = new Map();
 const socketidToEmailMap = new Map();
 
@@ -1055,8 +1063,12 @@ io.on("connection", (socket) => {
   });
 });
 
-http.listen(4400, function () {
-  console.log("Rooms on 4400");
+http.listen(process.env.PORT, function () {
+  console.log({
+    rooms:`${process.env.PORT}`,
+    messeage:"server started",
+    secure:false
+  });
 });
 
 const markoffline = async ({ uid }) => {

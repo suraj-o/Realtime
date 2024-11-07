@@ -1,0 +1,13 @@
+version: '3.1'
+
+services:
+  grovyo:
+    image: realtime
+    ports:
+      - "4400:4400"
+    environment:
+      PORT: 4400
+      DATABASE: "mongodb://Ruh:Shreyan%40sh379@13.201.106.188:27017/?authMechanism=DEFAULT"
+      URL: "https://dn3w8358m09e7.cloudfront.net/"
+      AGORA_APP_ID: "9ef3de8dca0c4e83884ded1b98e67efd"
+      AGORA_APP_CERTIFICATE: "6702a607e5e94f5f9aa90c00c347094b"
