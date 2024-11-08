@@ -27,7 +27,8 @@ const {
   RtcRole,
   RtmRole,
 } = require("agora-access-token");
-
+const PrositeAnalytics = require("./models/PrositeAnalytics");
+const moment = require("moment");
 require("dotenv").config();
 
 app.use(require("express-status-monitor")());
@@ -57,13 +58,12 @@ admin.initializeApp({
 // roomManager
 let rooms = [];
 
-
-app.get("/",(req,res)=>{
+app.get("/", (req, res) => {
   res.status(200).json({
-    succes:true,
-    messages:"all is good and healthy"
-  })
-})
+    succes: true,
+    messages: "all is good and healthy",
+  });
+});
 
 const emailToSocketIdMap = new Map();
 const socketidToEmailMap = new Map();
@@ -488,43 +488,6 @@ io.on("connection", (socket) => {
       sendNotifcation(data);
     }
   });
-
-  // socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
-  //   const usercheck = await isUserInRoom({ roomName: roomId, userId: userId });
-  //   const rec = await User.findById(data?.reciever);
-  //   const sender = await User.findById(data?.sender_id);
-
-  //   let isblocked = false;
-  //   rec.blockedpeople.forEach((p) => {
-  //     if (p?.id?.toString() === sender._id.toString()) {
-  //       isblocked = true;
-  //     }
-  //   });
-  //   sender.blockedpeople.forEach((p) => {
-  //     if (p?.id?.toString() === rec._id.toString()) {
-  //       isblocked = true;
-  //     }
-  //   });
-  //   SaveChats(data);
-  //   if (isblocked === false) {
-  //     if (usercheck) {
-  //       console.log("sent to", userId);
-  //       socket.join(roomId);
-  //       socket.to(roomId).emit("ms", data);
-  //       socket.to(userId).emit("allchats", ext);
-
-  //       sendNoti(data);
-  //     } else {
-  //       console.log("joined and sent");
-  //       socket.join(roomId);
-  //       addUserToRoom(roomId, userId, socket.id);
-  //       socket.to(roomId).emit("ms", data);
-  //       socket.to(userId).emit("allchats", ext);
-
-  //       sendNoti(data);
-  //     }
-  //   }
-  // });
 
   //for private messages
   socket.on("singleChatMessage", async ({ roomId, userId, data, ext }) => {
@@ -1056,18 +1019,135 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("prositeCount", async ({ prositeUserId, userId }) => {
+    const user = await User.findById(userId).select("gender DOB address");
+    if (!user) return;
+
+    const gender = user?.gender?.toLowerCase();
+    const state = user?.address?.state;
+    const age = user?.DOB
+      ? moment().diff(moment(user.DOB, "DD/MM/YYYY"), "years")
+      : null;
+    console.log(gender, state, age, "gender, state, age");
+
+    // Find or create prositeAnalytics document
+    let prositeAnalytics = await PrositeAnalytics.findOne({
+      userId: prositeUserId,
+    });
+    if (!prositeAnalytics) {
+      prositeAnalytics = new PrositeAnalytics({
+        userId: prositeUserId,
+        visitors: [],
+        totalVisitors: [{ visitors: 0, date: new Date() }],
+        totalTimeSpent: 0,
+        numberOfSessions: 0,
+        demographics: {
+          age: { "0-14": 0, "15-28": 0, "29-42": 0, "43-65": 0, "65+": 0 },
+          gender: { male: 0, female: 0 },
+        },
+        location: {
+          "Andaman & Nicobar Islands": 0,
+          "Andhra Pradesh": 0,
+          "Arunachal Pradesh": 0,
+          Assam: 0,
+          Bihar: 0,
+          Chhattisgarh: 0,
+          Chandigarh: 0,
+          "Dadra & Nagar Haveli And Daman DIU": 0,
+          "Daman & Diu": 0,
+          Delhi: 0,
+          Goa: 0,
+          Gujarat: 0,
+          Haryana: 0,
+          "Himachal Pradesh": 0,
+          "Jammu & Kashmir": 0,
+          Jharkhand: 0,
+          Karnataka: 0,
+          Kerala: 0,
+          Lakshadweep: 0,
+          "Madhya Pradesh": 0,
+          Maharashtra: 0,
+          Manipur: 0,
+          Meghalaya: 0,
+          Mizoram: 0,
+          Nagaland: 0,
+          Odisha: 0,
+          Puducherry: 0,
+          Punjab: 0,
+          Rajasthan: 0,
+          Sikkim: 0,
+          "Tamil Nadu": 0,
+          Telangana: 0,
+          Tripura: 0,
+          "Uttar Pradesh": 0,
+          Uttarakhand: 0,
+          "West Bengal": 0,
+        },
+      });
+    }
+
+    // Helper function to determine age group
+    const getAgeGroup = (age) => {
+      if (age <= 14) return "0-14";
+      if (age <= 28) return "15-28";
+      if (age <= 42) return "29-42";
+      if (age <= 65) return "43-65";
+      return "65+";
+    };
+
+    const ageGroup = getAgeGroup(age);
+
+    // Update demographics
+    prositeAnalytics.demographics.age[ageGroup] =
+      (prositeAnalytics.demographics.age[ageGroup] || 0) + 1;
+    prositeAnalytics.demographics.gender[gender] =
+      (prositeAnalytics.demographics.gender[gender] || 0) + 1;
+    prositeAnalytics.location[state] =
+      (prositeAnalytics.location[state] || 0) + 1;
+
+    // Track visitors
+
+    prositeAnalytics.visitors.push({ id: userId, visitDate: new Date() });
+
+    const today = moment().startOf("day");
+
+    // Check if today's entry exists in totalVisitors
+    let todayEntry = prositeAnalytics.totalVisitors.find((entry) =>
+      moment(entry.date).isSame(today, "day")
+    );
+
+    if (!todayEntry) {
+
+      // If no entry for today, add a new one
+      todayEntry = { visitors: 0, date: new Date() };
+      prositeAnalytics.totalVisitors.push(todayEntry);
+    }
+
+    todayEntry.visitors += 1;
+
+    prositeAnalytics.numberOfSessions += 1;
+    const random = getRandomSeconds()
+    prositeAnalytics.totalTimeSpent = prositeAnalytics.totalTimeSpent + random;
+
+    // Save changes
+    await prositeAnalytics.save();
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
     updateUserLeaveTime({ socketId: socket.id });
     removeUserFromAllRoomsBySocketId({ socketId: socket.id });
   });
 });
+function getRandomSeconds() {
+  return Math.floor(Math.random() * 60) + 1;
+}
 
 http.listen(process.env.PORT, function () {
   console.log({
-    rooms:`${process.env.PORT}`,
-    messeage:"server started",
-    secure:false
+    rooms: `${process.env.PORT}`,
+    messeage: "server started",
+    secure: false,
   });
 });
 
@@ -1511,7 +1591,7 @@ const sendNotifcationCommunity = async ({ id, postId, optionId, comId }) => {
       }
     }
   } catch (e) {
-    console.log("error=>",e);
+    console.log("error=>", e);
   }
 };
 
