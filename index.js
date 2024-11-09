@@ -265,27 +265,36 @@ const generateRtcToken = function ({ convId, id, isHost }) {
   return key;
 };
 
-//middleware
 io.use(async (socket, next) => {
   const sessionID = socket.handshake.auth.id;
   const type = socket.handshake.auth.type;
-  console.log(sessionID);
+  const skipMiddleware = socket.handshake.auth.skipMiddleware;
+
+  // If skipMiddleware is true, allow the connection without running the full middleware
+  if (skipMiddleware) {
+    console.log("Middleware skipped for socket:", socket.id);
+    return next();
+  }
+
+  // If sessionID is provided, run the middleware logic
   if (sessionID) {
     socket.join(sessionID);
+    
     if (type === "mobile") {
       const user = await User.findById(sessionID);
 
       if (user && user.notificationtoken) {
-        //awake notification
+        // Awake notification
         let data = { id: user._id, notificationtoken: user.notificationtoken };
-        //  sendNotiouter(data);
+        // sendNotiouter(data);
       }
     }
     // sessionStore(sessionID);
-    console.log("middleware ran for", sessionID, "in", type);
+    console.log("Middleware ran for", sessionID, "in", type);
     return next();
   }
 });
+
 
 io.on("connection", (socket) => {
   socket.on("joinUser", ({ userId, roomId }) => {
