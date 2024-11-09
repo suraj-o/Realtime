@@ -930,6 +930,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("qr-scan", ({ id,string }) => {  
+    console.log("runnded",id,string)
+    console.log(socket.emit(string,{id}))
     socket.emit(string,{id})
   });
 
