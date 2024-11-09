@@ -929,6 +929,10 @@ io.on("connection", (socket) => {
     socket.to(to).emit("set:ans", { ans });
   });
 
+  socket.on("qr-scan", ({ id,string }) => {  
+    socket.emit(string,{id})
+  });
+
   //end
 
   socket.on("user:call", ({ to, offer }) => {
