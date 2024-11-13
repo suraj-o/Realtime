@@ -6,7 +6,7 @@ const morgan = require("morgan");
 const cors = require("cors");
 const http = require("http").Server(app);
 const io = require("socket.io")(http);
-const serviceKey = require("./grovyo-89dc2-firebase-adminsdk-pwqju-41deeae515.json");
+const serviceKey = require("./grovyo-89dc2-ff6415ff18de.json");
 const admin = require("firebase-admin");
 const mongoose = require("mongoose");
 const User = require("./models/User");
@@ -294,7 +294,6 @@ io.use(async (socket, next) => {
     return next();
   }
 });
-
 
 io.on("connection", (socket) => {
   socket.on("joinUser", ({ userId, roomId }) => {
@@ -930,11 +929,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("qr-scan", ({ id,string }) => {  
-    console.log("runnded",id,string)
-    console.log(socket.emit(string,{id}))
-    socket.emit(`${string}`,{id})
+    console.log("runnded",id,string,socket.id)
+  
+    io.to(string).emit("qr-rec",id)
   });
-
   //end
 
   socket.on("user:call", ({ to, offer }) => {
