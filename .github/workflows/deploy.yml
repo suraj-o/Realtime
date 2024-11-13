@@ -25,10 +25,10 @@ jobs:
           context: .
           file: dockerfile
           push: true
-          tags: suraj266/realtime:latest
+          tags: grovyo/realtime:latest
 
       - name: Verify Pushed Image
-        run: docker pull suraj266/realtime:latest  
+        run: docker pull grovyo/realtime:latest  
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -37,7 +37,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            sudo docker pull suraj266/realtime:latest
+            sudo docker pull grovyo/realtime:latest
             sudo docker stop realtime || true
             sudo docker rm realtime || true
             sudo docker run -d --name realtime -p ${{ secrets.PORT }}:${{ secrets.PORT }} \
@@ -46,4 +46,4 @@ jobs:
               --env URL="${{ secrets.URL }}" \
               --env AGORA_APP_ID="${{ secrets.AGORA_APP_ID }}" \
               --env AGORA_APP_CERTIFICATE="${{ secrets.AGORA_APP_CERTIFICATE }}" \
-              suraj266/realtime:latest
+              grovyo/realtime:latest
